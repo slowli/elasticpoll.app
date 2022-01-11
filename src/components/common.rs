@@ -78,52 +78,44 @@ impl Icon {
 }
 
 impl PollSpec {
-    // TODO: rework to look more intuitive
     pub(super) fn view_summary(&self) -> Html {
+        let ty = self.poll_type;
         let options = self
             .options
             .iter()
-            .map(|option| Self::view_option_in_summary(option))
+            .enumerate()
+            .map(|(idx, option)| Self::view_option_in_summary(idx, option, ty))
             .collect::<Html>();
-        let poll_type = match self.poll_type {
-            PollType::SingleChoice => "Single choice",
-            PollType::MultiChoice => "Multiple choice",
-        };
         html! {
             <>
-                { view_data_row(
-                    html! { <label for="poll-title"><strong>{ "Title" }</strong></label> },
-                    html! { <div id="poll-title">{ &self.title }</div> },
-                ) }
-                { view_data_row(
-                    html! {
-                        <label for="poll-description">
-                            <strong>{ "Description" }</strong>
-                        </label>
-                    },
-                    html! {
-                        <div id="poll-description">
-                            {if self.description.trim().is_empty() {
-                                html! { <em>{ "(No description provided)" }</em> }
-                            } else {
-                                html! { &self.description }
-                            }}
-                        </div>
-                    },
-                ) }
-                { view_data_row(
-                    html! { <label for="poll-type"><strong>{ "Type" }</strong></label> },
-                    html! { <div id="poll-type">{ poll_type }</div> },
-                ) }
-                { view_data_row(
-                    html! { <label for="poll-options"><strong>{ "Options" }</strong></label> },
-                    html! { <ul id="poll-options" class="list-unstyled">{ options }</ul> },
-                ) }
+                <h5>{ &self.title }</h5>
+                {if self.description.trim().is_empty() {
+                    html! { }
+                } else {
+                    html! { <p>{ &self.description }</p> }
+                }}
+                <div>{ options }</div>
             </>
         }
     }
 
-    fn view_option_in_summary(option: &str) -> Html {
-        html! { <li>{ option }</li> }
+    fn view_option_in_summary(idx: usize, option: &str, ty: PollType) -> Html {
+        let control_id = format!("poll-option{}", idx);
+        let (control_type, control_name) = match ty {
+            PollType::SingleChoice => ("radio", "poll-options".to_owned()),
+            PollType::MultiChoice => ("checkbox", control_id.clone()),
+        };
+        html! {
+            <div class="form-check form-check-inline">
+                <input
+                    class="form-check-input"
+                    type={control_type}
+                    name={control_name}
+                    id={control_id.clone()}
+                    value={idx.to_string()}
+                    disabled=true />
+                <label class="form-check-label" for={control_id}>{ option }</label>
+            </div>
+        }
     }
 }
