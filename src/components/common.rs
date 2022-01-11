@@ -78,6 +78,7 @@ impl Icon {
 }
 
 impl PollSpec {
+    // TODO: rework to look more intuitive
     pub(super) fn view_summary(&self) -> Html {
         let options = self
             .options

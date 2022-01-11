@@ -153,37 +153,38 @@ impl Participants {
         html! {
             <div class="card mb-2">
                 <div class="card-body">
-                    <h5 class="card-title d-flex">
-                        <span class="me-auto">{ "#" }{ &(idx + 1).to_string() }{ our_mark }</span>
-                        <div class="btn-group btn-group-sm" role="group" aria-label="Actions">
-                            <button
-                                type="button"
-                                class="btn btn-secondary"
-                                title="Copy participant application to clipboard"
-                                onclick={link.callback(move |_| {
-                                    ParticipantsMessage::ExportRequested(idx)
-                                })}>
-                                { Icon::Export.view() }
-                            </button>
-                            <button
-                                type="button"
-                                class="btn btn-danger"
-                                title="Remove this participant"
-                                onclick={link.callback(move |_| {
-                                    ParticipantsMessage::ParticipantRemoved(idx)
-                                })}>
-                                { Icon::Remove.view() }
-                            </button>
-                        </div>
-                    </h5>
+                    <div class="btn-group btn-group-sm float-end ms-2 mb-2"
+                        role="group"
+                        aria-label="Actions">
+
+                        <button
+                            type="button"
+                            class="btn btn-secondary"
+                            title="Copy participant application to clipboard"
+                            onclick={link.callback(move |_| {
+                                ParticipantsMessage::ExportRequested(idx)
+                            })}>
+                            { Icon::Export.view() }
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-danger"
+                            title="Remove this participant"
+                            onclick={link.callback(move |_| {
+                                ParticipantsMessage::ParticipantRemoved(idx)
+                            })}>
+                            { Icon::Remove.view() }
+                        </button>
+                    </div>
+                    <h5 class="card-title">{ "#" }{ &(idx + 1).to_string() }{ our_mark }</h5>
+                    <p class="card-subtitle mb-2 small text-muted">
+                        // FIXME: use real date
+                        { "Added on 2022-01-07 13:00:17 UTC" }
+                    </p>
                     <p class="card-text mb-0">
                         <strong>{ "Public key:" }</strong>
                         { " " }
                         { &participant.public_key.encode() }
-                    </p>
-                    <p class="card-text">
-                        // FIXME: use real date
-                        <small class="text-muted">{ "Added on 2022-01-07 13:00:17 UTC" }</small>
                     </p>
                 </div>
             </div>

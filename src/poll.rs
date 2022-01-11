@@ -113,6 +113,23 @@ impl PollParticipant {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum PollStage {
+    New,
+    AddingParticipants { participants: usize },
+}
+
+impl PollStage {
+    pub const MAX_INDEX: usize = 1;
+
+    pub fn index(&self) -> usize {
+        match self {
+            Self::New => 0,
+            Self::AddingParticipants { .. } => 1,
+        }
+    }
+}
+
 /// Ongoing or finished poll state.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PollState {
@@ -126,6 +143,16 @@ impl PollState {
         Self {
             spec,
             participants: Vec::new(),
+        }
+    }
+
+    pub fn stage(&self) -> PollStage {
+        if self.participants.is_empty() {
+            PollStage::New
+        } else {
+            PollStage::AddingParticipants {
+                participants: self.participants.len(),
+            }
         }
     }
 
@@ -176,6 +203,40 @@ impl PollManager {
         id
     }
 
+    /// Lists polls together with the respective IDs.
+    pub fn polls(&self) -> HashMap<PollId, PollState> {
+        let local_storage = local_storage();
+        // This iteration protocol assumes that the storage is not modified concurrently.
+        let len = local_storage
+            .length()
+            .expect_throw("cannot obtain local storage length");
+        let polls = (0..len).filter_map(|idx| {
+            let key = local_storage
+                .key(idx)
+                .expect_throw("cannot obtain key from storage")?;
+            self.extract_poll_id(&key).and_then(|poll_id| {
+                let state_string = local_storage
+                    .get_item(&key)
+                    .expect_throw("failed getting poll state")?;
+                let state = serde_json::from_str(&state_string).ok()?;
+                Some((poll_id, state))
+            })
+        });
+        polls.collect()
+    }
+
+    fn extract_poll_id(&self, storage_key: &str) -> Option<PollId> {
+        if !storage_key.starts_with(self.storage_key_prefix) {
+            return None;
+        }
+        let key_tail = &storage_key[self.storage_key_prefix.len()..];
+        if !key_tail.starts_with("::poll::") {
+            return None;
+        }
+        let key_tail = &key_tail[8..]; // "::poll::".len() == 8
+        PollId::from_str(key_tail).ok()
+    }
+
     /// Gets the poll state by ID.
     pub fn poll(&self, id: &PollId) -> Option<PollState> {
         let local_storage = local_storage();
@@ -194,6 +255,14 @@ impl PollManager {
         local_storage
             .set_item(&key, &poll)
             .expect_throw("failed saving poll");
+    }
+
+    pub fn remove_poll(&self, id: &PollId) {
+        let local_storage = local_storage();
+        let key = format!("{}::poll::{}", self.storage_key_prefix, id);
+        local_storage
+            .remove_item(&key)
+            .expect_throw("cannot remove `PollState` from local storage");
     }
 }
 

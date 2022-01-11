@@ -7,13 +7,14 @@ use yew_router::prelude::*;
 
 mod about;
 mod common;
+mod home;
 mod new_poll;
 mod participants;
 
-use self::{about::About, new_poll::NewPoll, participants::Participants};
+use self::{about::About, home::Home, new_poll::NewPoll, participants::Participants};
 use crate::{
     layout,
-    poll::{PollId, PollManager, PollSpec},
+    poll::{PollId, PollManager, PollSpec, PollStage},
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -41,6 +42,8 @@ pub enum ExportedDataType {
 pub enum Route {
     #[at("/")]
     Home,
+    #[at("/polls/new")]
+    NewPoll,
     #[at("/polls/:id/participants")]
     PollParticipants { id: PollId },
     #[at("/about")]
@@ -48,6 +51,12 @@ pub enum Route {
     #[not_found]
     #[at("/404")]
     NotFound,
+}
+
+impl Route {
+    pub fn for_poll(id: PollId, _stage: PollStage) -> Self {
+        Self::PollParticipants { id }
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Properties)]
@@ -106,7 +115,8 @@ impl Main {
             .reform(|data| ExportedData::new(ExportedDataType::Application, data));
 
         match route {
-            Route::Home => html! {
+            Route::Home => html! { <Home /> },
+            Route::NewPoll => html! {
                 <NewPoll
                     onexport={on_poll_export}
                     ondone={link.callback(AppMessage::PollCreated)} />
