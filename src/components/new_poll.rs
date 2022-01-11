@@ -1,10 +1,11 @@
 //! New poll wizard page.
 
+use rand_core::{OsRng, RngCore};
 use wasm_bindgen::{JsCast, UnwrapThrowExt};
 use web_sys::{Event, HtmlInputElement, HtmlTextAreaElement};
 use yew::{classes, html, Callback, Component, Context, Html, Properties};
 
-use super::common::{view_data_row, view_err, Icon, ValidatedValue};
+use super::common::{view_data_row, view_err, Icon, PageMetadata, ValidatedValue};
 use crate::poll::{PollSpec, PollType, MAX_OPTIONS};
 
 #[derive(Debug)]
@@ -75,6 +76,7 @@ pub struct NewPollProperties {
 /// "New poll" page.
 #[derive(Debug)]
 pub struct NewPoll {
+    metadata: PageMetadata,
     title: ValidatedValue,
     description: ValidatedValue,
     poll_type: PollType,
@@ -546,12 +548,21 @@ impl Component for NewPoll {
     type Properties = NewPollProperties;
 
     fn create(_: &Context<Self>) -> Self {
+        let nonce = OsRng.next_u64();
         Self {
+            metadata: PageMetadata {
+                title: "Specifying new poll".to_owned(),
+                description: "Specify details for a new poll, such as title, description,\
+                    type (single choice or multiple choice) and available options. \
+                    Also allows to import and export the poll."
+                    .to_owned(),
+                is_root: false,
+            },
             title: ValidatedValue::unvalidated("Sample poll".to_owned()),
             description: ValidatedValue::default(),
             poll_type: PollType::SingleChoice,
             poll_options: vec![ValidatedValue::unvalidated("Option #1".to_owned())],
-            nonce: 0, // FIXME: generate randomly
+            nonce,
             spec: ValidatedValue::default(),
         }
     }
@@ -607,10 +618,10 @@ impl Component for NewPoll {
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         let is_invalid = !self.is_valid();
-
         let link = ctx.link();
         html! {
             <>
+                { self.metadata.view() }
                 <p class="lead">{ "First, you need to specify the polling parameters." }</p>
                 <p>{ "You can visually edit either visually or directly as JSON. Once the poll \
                     specification is ready, you can export it to share via a reliable broadcast \

@@ -3,7 +3,10 @@
 use yew::{classes, html, Component, Context, Html};
 use yew_router::prelude::*;
 
-use super::{common::Icon, Route};
+use super::{
+    common::{Icon, PageMetadata},
+    Route,
+};
 use crate::poll::{PollId, PollManager, PollStage, PollState};
 
 #[derive(Debug)]
@@ -15,6 +18,7 @@ pub enum HomeMessage {
 #[derive(Debug)]
 pub struct Home {
     poll_manager: PollManager,
+    metadata: PageMetadata,
 }
 
 impl Home {
@@ -109,6 +113,13 @@ impl Component for Home {
 
     fn create(_: &Context<Self>) -> Self {
         Self {
+            metadata: PageMetadata {
+                title: "Welcome".to_owned(),
+                description: "A fully contained WASM web app allowing to hold polls \
+                    in a cryptographically secure and private manner."
+                    .to_owned(),
+                is_root: true,
+            },
             poll_manager: PollManager::default(),
         }
     }
@@ -126,6 +137,7 @@ impl Component for Home {
     fn view(&self, ctx: &Context<Self>) -> Html {
         html! {
             <>
+                { self.metadata.view() }
                 <p class="lead">{ "Welcome!" }</p>
                 <p>{ "Lorem ipsum dolor amet. Lorem ipsum dolor amet. Lorem ipsum dolor amet." }</p>
                 <h4>{ "Existing polls" }</h4>

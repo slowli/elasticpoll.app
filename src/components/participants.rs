@@ -7,7 +7,7 @@ use yew_router::prelude::*;
 
 use crate::{
     components::{
-        common::{view_data_row, view_err, Icon, ValidatedValue},
+        common::{view_data_row, view_err, Icon, PageMetadata, ValidatedValue},
         Route,
     },
     poll::{PollId, PollManager, PollParticipant, PollState, SecretManager},
@@ -42,6 +42,7 @@ pub struct ParticipantsProperties {
 
 #[derive(Debug)]
 pub struct Participants {
+    metadata: PageMetadata,
     secret_manager: SecretManager,
     poll_manager: PollManager,
     poll_id: PollId,
@@ -309,6 +310,13 @@ impl Component for Participants {
         let poll_manager = PollManager::default();
         let poll_state = poll_manager.poll(&ctx.props().id);
         Self {
+            metadata: PageMetadata {
+                title: "Configure participants for poll".to_owned(),
+                description: "Configure cryptographic identities (public keys) of \
+                    eligible voters and talliers."
+                    .to_owned(),
+                is_root: false,
+            },
             secret_manager: SecretManager::default(),
             poll_manager: PollManager::default(),
             poll_id: ctx.props().id,
@@ -352,6 +360,7 @@ impl Component for Participants {
         if let Some(state) = &self.poll_state {
             html! {
                 <>
+                    { self.metadata.view() }
                     { self.view_poll(state, ctx) }
                     { self.view_new_participant_form(state, ctx) }
                 </>

@@ -2,11 +2,23 @@
 
 use yew::{function_component, html};
 
+use super::common::PageMetadata;
+
 // TODO: add build details
 #[function_component(About)]
 pub fn about_page() -> Html {
+    let metadata = PageMetadata {
+        title: "About the app".to_owned(),
+        description: "??? is a fully contained WASM web app allowing to hold polls \
+            in a cryptographically secure and private manner. \
+            This page lists main technologies about the app and some debugging info."
+            .to_owned(),
+        is_root: false,
+    };
+
     html! {
         <>
+            { metadata.view() }
             <p class="lead mb-4">
                 { "This web app was made possible with the help of following awesome tech:" }
             </p>

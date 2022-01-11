@@ -1,5 +1,6 @@
 //! Common components.
 
+use wasm_bindgen::UnwrapThrowExt;
 use yew::{classes, html, Html};
 
 use crate::poll::{PollSpec, PollType};
@@ -117,5 +118,52 @@ impl PollSpec {
                 <label class="form-check-label" for={control_id}>{ option }</label>
             </div>
         }
+    }
+}
+
+/// Component responsible for rendering page metadata via a portal.
+#[derive(Debug)]
+pub struct PageMetadata {
+    pub title: String,
+    pub description: String,
+    pub is_root: bool,
+}
+
+impl PageMetadata {
+    pub fn view(&self) -> Html {
+        let window = web_sys::window().expect_throw("no Window");
+        let document = window.document().expect_throw("no Document");
+        let head = document.head().expect_throw("no <head> in Document");
+        yew::create_portal(self.view_meta(), head.into())
+    }
+
+    fn view_meta(&self) -> Html {
+        html! {
+            <>
+                <meta name="description" content={self.description.clone()} />
+                <meta name="og:title" content={self.title.clone()} />
+                <meta name="og:description" content={self.description.clone()} />
+                <script type="application/ld+json">{ self.linked_data() }</script>
+                <title>{ &self.title }{ " | Voting" }</title>
+            </>
+        }
+    }
+
+    fn linked_data(&self) -> String {
+        format!(
+            r#"{{
+                "@context": "https://schema.org/",
+                "@type": "{ty}",
+                "author": {{
+                  "@type": "Person",
+                  "name": "Alex Ostrovski"
+                }},
+                "headline": "{title}",
+                "description": "{description}"
+            }}"#,
+            ty = if self.is_root { "WebSite" } else { "WebPage" },
+            title = self.title,
+            description = self.description
+        )
     }
 }
