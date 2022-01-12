@@ -10,11 +10,14 @@ mod common;
 mod home;
 mod new_poll;
 mod participants;
+mod voting;
 
-use self::{about::About, home::Home, new_poll::NewPoll, participants::Participants};
+use self::{
+    about::About, home::Home, new_poll::NewPoll, participants::Participants, voting::Voting,
+};
 use crate::{
     layout,
-    poll::{PollId, PollManager, PollSpec, PollStage},
+    poll::{PollId, PollManager, PollSpec, PollStage, PollState},
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -46,6 +49,8 @@ pub enum Route {
     NewPoll,
     #[at("/polls/:id/participants")]
     PollParticipants { id: PollId },
+    #[at("/polls/:id/vote")]
+    Voting { id: PollId },
     #[at("/about")]
     About,
     #[not_found]
@@ -54,8 +59,11 @@ pub enum Route {
 }
 
 impl Route {
-    pub fn for_poll(id: PollId, _stage: PollStage) -> Self {
-        Self::PollParticipants { id }
+    pub fn for_poll(id: PollId, stage: PollStage) -> Self {
+        match stage {
+            PollStage::New | PollStage::AddingParticipants { .. } => Self::PollParticipants { id },
+            PollStage::Voting { .. } => Self::Voting { id },
+        }
     }
 }
 
@@ -69,6 +77,7 @@ pub struct AppProperties {
 #[derive(Debug)]
 pub enum AppMessage {
     PollCreated(PollSpec),
+    ParticipantsFinalized(PollId, Box<PollState>),
 }
 
 /// Root application component.
@@ -116,19 +125,28 @@ impl Main {
 
         match route {
             Route::Home => html! { <Home /> },
+            Route::About => html! { <About /> },
+            Route::NotFound => html! { <NotFound /> },
+
             Route::NewPoll => html! {
                 <NewPoll
                     onexport={on_poll_export}
                     ondone={link.callback(AppMessage::PollCreated)} />
             },
-            Route::PollParticipants { id } => html! {
-                <Participants
-                    id={*id}
-                    onexport={on_participant_export} />
+            Route::PollParticipants { id } => {
+                let id = *id;
+                html! {
+                    <Participants
+                        id={id}
+                        onexport={on_participant_export}
+                        ondone={link.callback(move |state| {
+                            AppMessage::ParticipantsFinalized(id, Box::new(state))
+                        })} />
+                }
+            }
+            Route::Voting { id } => html! {
+                <Voting id={*id} />
             },
-
-            Route::About => html! { <About /> },
-            Route::NotFound => html! { <NotFound /> },
         }
     }
 }
@@ -144,14 +162,19 @@ impl Component for Main {
     }
 
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+        let history = ctx.link().history().expect_throw("cannot get history");
         match msg {
             AppMessage::PollCreated(spec) => {
-                let id = self.poll_manager.save_poll(spec);
-                let history = ctx.link().history().expect_throw("cannot get history");
+                let id = self.poll_manager.create_poll(spec);
                 history.replace(Route::PollParticipants { id });
-                true
+            }
+            AppMessage::ParticipantsFinalized(id, mut state) => {
+                state.finalize_participants();
+                self.poll_manager.update_poll(&id, &state);
+                history.push(Route::Voting { id });
             }
         }
+        true
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {

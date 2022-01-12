@@ -1,7 +1,7 @@
 //! Poll participants wizard page.
 
-use wasm_bindgen::{JsCast, UnwrapThrowExt};
-use web_sys::{Event, HtmlTextAreaElement};
+use wasm_bindgen::UnwrapThrowExt;
+use web_sys::Event;
 use yew::{classes, html, Callback, Component, Context, Html, Properties};
 use yew_router::prelude::*;
 
@@ -11,7 +11,7 @@ use super::{
 };
 use crate::{
     poll::{Participant, ParticipantApplication, PollId, PollManager, PollState, SecretManager},
-    utils::Encode,
+    utils::{value_from_event, Encode},
 };
 
 #[derive(Debug)]
@@ -21,15 +21,12 @@ pub enum ParticipantsMessage {
     ParticipantAdded,
     UsAdded,
     ExportRequested(usize),
+    Done,
 }
 
 impl ParticipantsMessage {
     fn application_set(event: &Event) -> Self {
-        let target = event.target().expect_throw("no target for change event");
-        let target = target
-            .dyn_into::<HtmlTextAreaElement>()
-            .expect_throw("unexpected target for token set event");
-        Self::ApplicationSet(target.value())
+        Self::ApplicationSet(value_from_event(event))
     }
 }
 
@@ -38,6 +35,8 @@ pub struct ParticipantsProperties {
     pub id: PollId,
     #[prop_or_default]
     pub onexport: Callback<String>,
+    #[prop_or_default]
+    pub ondone: Callback<PollState>,
 }
 
 #[derive(Debug)]
@@ -77,8 +76,7 @@ impl Participants {
     fn set_application(&mut self, application: String) {
         self.validated_application = None;
 
-        let parsed_application = match serde_json::from_str::<ParticipantApplication>(&application)
-        {
+        let parsed_application: ParticipantApplication = match serde_json::from_str(&application) {
             Ok(application) => application,
             Err(err) => {
                 self.new_application = ValidatedValue {
@@ -246,7 +244,7 @@ impl Participants {
         let link = ctx.link();
         html! {
             <form>
-                { if let Some(shared_key) = state.shared_public_key() {
+                { if let Some(shared_key) = state.shared_key() {
                     view_data_row(
                         html! {
                             <label for="shared-key"><strong>{ "Shared key" }</strong></label>
@@ -275,7 +273,7 @@ impl Participants {
                     html! {
                         <>
                             <textarea
-                                id="poll-spec"
+                                id="participant-application"
                                 class={control_classes}
                                 placeholder="JSON-encoded participant application"
                                 value={self.new_application.value.clone()}
@@ -301,6 +299,7 @@ impl Component for Participants {
     type Message = ParticipantsMessage;
     type Properties = ParticipantsProperties;
 
+    // FIXME: react to poll state
     fn create(ctx: &Context<Self>) -> Self {
         let poll_manager = PollManager::default();
         let poll_state = poll_manager.poll(&ctx.props().id);
@@ -348,17 +347,33 @@ impl Component for Participants {
                 }
                 return false;
             }
+
+            ParticipantsMessage::Done => {
+                let state = self.poll_state.take().expect_throw("no poll state");
+                ctx.props().ondone.emit(state);
+                return false; // There will be a redirect; no need to re-render this page.
+            }
         }
         true
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         if let Some(state) = &self.poll_state {
+            let link = ctx.link();
             html! {
                 <>
                     { self.metadata.view() }
                     { self.view_poll(state, ctx) }
                     { self.view_new_participant_form(state, ctx) }
+                    <div class="mt-4 text-center">
+                        <button
+                            type="button"
+                            class="btn btn-primary"
+                            disabled={state.participants.is_empty()}
+                            onclick={link.callback(|_| ParticipantsMessage::Done)}>
+                            { Icon::Check.view() }{ " Next: voting" }
+                        </button>
+                    </div>
                 </>
             }
         } else {

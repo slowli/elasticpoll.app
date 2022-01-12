@@ -2,9 +2,10 @@
 
 use js_sys::Date;
 use wasm_bindgen::UnwrapThrowExt;
-use yew::{classes, html, Html};
+use web_sys::Event;
+use yew::{classes, html, Callback, Html};
 
-use crate::poll::{PollSpec, PollType};
+use crate::poll::{PollSpec, PollType, VoteChoice};
 
 pub fn view_local_timestamp(timestamp: f64) -> Html {
     let date = Date::new(&timestamp.into());
@@ -88,14 +89,27 @@ impl Icon {
     }
 }
 
+type OptionChangeCallback = Callback<(usize, Event)>;
+
 impl PollSpec {
     pub(super) fn view_summary(&self) -> Html {
+        self.view(None, None)
+    }
+
+    pub(super) fn view_as_form(&self, choice: &VoteChoice, onchange: OptionChangeCallback) -> Html {
+        self.view(Some(choice), Some(onchange))
+    }
+
+    fn view(&self, choice: Option<&VoteChoice>, onchange: Option<OptionChangeCallback>) -> Html {
         let ty = self.poll_type;
         let options = self
             .options
             .iter()
             .enumerate()
-            .map(|(idx, option)| Self::view_option_in_summary(idx, option, ty))
+            .map(|(idx, option)| {
+                let is_selected = choice.map(|choice| choice.is_selected(idx));
+                Self::view_option(idx, option, ty, is_selected, onchange.clone())
+            })
             .collect::<Html>();
         html! {
             <>
@@ -110,12 +124,22 @@ impl PollSpec {
         }
     }
 
-    fn view_option_in_summary(idx: usize, option: &str, ty: PollType) -> Html {
+    fn view_option(
+        idx: usize,
+        option: &str,
+        ty: PollType,
+        is_selected: Option<bool>,
+        onchange: Option<OptionChangeCallback>,
+    ) -> Html {
         let control_id = format!("poll-option{}", idx);
         let (control_type, control_name) = match ty {
             PollType::SingleChoice => ("radio", "poll-options".to_owned()),
             PollType::MultiChoice => ("checkbox", control_id.clone()),
         };
+        let is_disabled = is_selected.is_none();
+        let is_checked = is_selected.unwrap_or(false);
+        let onchange = onchange.map(|callback| callback.reform(move |evt| (idx, evt)));
+
         html! {
             <div class="form-check form-check-inline">
                 <input
@@ -124,7 +148,9 @@ impl PollSpec {
                     name={control_name}
                     id={control_id.clone()}
                     value={idx.to_string()}
-                    disabled=true />
+                    checked={is_checked}
+                    disabled={is_disabled}
+                    onchange={onchange} />
                 <label class="form-check-label" for={control_id}>{ option }</label>
             </div>
         }

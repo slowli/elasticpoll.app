@@ -1,6 +1,10 @@
 //! Poll data types.
 
-use elastic_elgamal::{group::Ristretto, Keypair, ProofOfPossession, PublicKey};
+use elastic_elgamal::{
+    app::{ChoiceParams, ChoiceVerificationError, EncryptedChoice, MultiChoice, SingleChoice},
+    group::Ristretto,
+    Keypair, ProofOfPossession, PublicKey, VerificationError,
+};
 use js_sys::Date;
 use merlin::Transcript;
 use rand_core::OsRng;
@@ -21,6 +25,15 @@ use crate::utils::{local_storage, VecHelper};
 pub enum PollType {
     SingleChoice,
     MultiChoice,
+}
+
+impl PollType {
+    fn as_human_string(self) -> &'static str {
+        match self {
+            Self::SingleChoice => "single choice",
+            Self::MultiChoice => "multiple choice",
+        }
+    }
 }
 
 impl FromStr for PollType {
@@ -120,6 +133,7 @@ pub struct Participant {
     #[serde(flatten)]
     pub application: ParticipantApplication,
     pub created_at: f64,
+    pub vote: Option<SubmittedVote>,
 }
 
 impl From<ParticipantApplication> for Participant {
@@ -127,6 +141,7 @@ impl From<ParticipantApplication> for Participant {
         Self {
             application,
             created_at: Date::now(),
+            vote: None,
         }
     }
 }
@@ -137,19 +152,227 @@ impl Participant {
     }
 }
 
+/// Plaintext voter's choice.
+#[derive(Debug)]
+pub enum VoteChoice {
+    SingleChoice(usize),
+    MultiChoice(Vec<bool>),
+}
+
+impl VoteChoice {
+    pub fn default(spec: &PollSpec) -> Self {
+        match spec.poll_type {
+            PollType::SingleChoice => Self::SingleChoice(0),
+            PollType::MultiChoice => Self::MultiChoice(vec![false; spec.options.len()]),
+        }
+    }
+
+    pub fn is_selected(&self, option_idx: usize) -> bool {
+        match self {
+            Self::SingleChoice(choice) => *choice == option_idx,
+            Self::MultiChoice(choices) => choices[option_idx],
+        }
+    }
+
+    pub fn select(&mut self, option_idx: usize, select: bool) {
+        match self {
+            Self::SingleChoice(choice) => {
+                if select {
+                    *choice = option_idx;
+                }
+            }
+            Self::MultiChoice(choices) => {
+                choices[option_idx] = select;
+            }
+        }
+    }
+
+    fn poll_type(&self) -> PollType {
+        match self {
+            Self::SingleChoice(_) => PollType::SingleChoice,
+            Self::MultiChoice(_) => PollType::MultiChoice,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum EncryptedVoteChoice {
+    SingleChoice(EncryptedChoice<Ristretto, SingleChoice>),
+    MultiChoice(EncryptedChoice<Ristretto, MultiChoice>),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Vote {
+    choice: EncryptedVoteChoice,
+    public_key: PublicKey<Ristretto>,
+    signature: ProofOfPossession<Ristretto>,
+}
+
+impl Vote {
+    pub fn new(
+        keypair: &Keypair<Ristretto>,
+        poll_id: &PollId,
+        poll: &PollState,
+        choice: &VoteChoice,
+    ) -> Self {
+        debug_assert_eq!(poll.spec.poll_type, choice.poll_type());
+
+        let shared_key = poll.finalized_shared_key().clone();
+        let options_count = poll.spec.options.len();
+        let choice = match choice {
+            VoteChoice::SingleChoice(choice) => {
+                let choice_params = ChoiceParams::single(shared_key, options_count);
+                let enc = EncryptedChoice::single(&choice_params, *choice, &mut OsRng);
+                EncryptedVoteChoice::SingleChoice(enc)
+            }
+            VoteChoice::MultiChoice(choices) => {
+                let choice_params = ChoiceParams::multi(shared_key, options_count);
+                let enc = EncryptedChoice::new(&choice_params, choices, &mut OsRng);
+                EncryptedVoteChoice::MultiChoice(enc)
+            }
+        };
+        Self::sign(keypair, poll_id, choice)
+    }
+
+    fn sign(keypair: &Keypair<Ristretto>, poll_id: &PollId, choice: EncryptedVoteChoice) -> Self {
+        let mut transcript = Self::create_transcript(poll_id, &choice);
+        let signature =
+            ProofOfPossession::new(slice::from_ref(keypair), &mut transcript, &mut OsRng);
+
+        Self {
+            choice,
+            public_key: keypair.public().clone(),
+            signature,
+        }
+    }
+
+    // Serializing to JSON is quite fragile, but should work (`VoteChoice` doesn't contain
+    // any related non-determinism, such as `HashMap`s).
+    fn create_transcript(poll_id: &PollId, choice: &EncryptedVoteChoice) -> Transcript {
+        let serialized_choice =
+            serde_json::to_string(choice).expect_throw("cannot serialize `VoteChoice`");
+        let mut transcript = Transcript::new(b"vote");
+        transcript.append_message(b"poll_id", &poll_id.0);
+        transcript.append_message(b"choice", serialized_choice.as_bytes());
+        transcript
+    }
+
+    fn verify(&self, poll_id: &PollId, poll: &PollState) -> Result<(), VoteError> {
+        // Check that the voter is eligible.
+        if !poll
+            .participants
+            .iter()
+            .any(|p| *p.public_key() == self.public_key)
+        {
+            return Err(VoteError::IneligibleVoter);
+        }
+
+        // Check signature.
+        let mut transcript = Self::create_transcript(poll_id, &self.choice);
+        self.signature
+            .verify(iter::once(&self.public_key), &mut transcript)
+            .map_err(VoteError::Signature)?;
+
+        // Check choice.
+        let shared_key = poll.finalized_shared_key().clone();
+        match &self.choice {
+            EncryptedVoteChoice::SingleChoice(choice) => {
+                VoteError::ensure_choice_type(poll.spec.poll_type, PollType::SingleChoice)?;
+                let choice_params = ChoiceParams::single(shared_key, poll.spec.options.len());
+                choice.verify(&choice_params).map_err(VoteError::Choice)?;
+            }
+            EncryptedVoteChoice::MultiChoice(choice) => {
+                VoteError::ensure_choice_type(poll.spec.poll_type, PollType::MultiChoice)?;
+                let choice_params = ChoiceParams::multi(shared_key, poll.spec.options.len());
+                choice.verify(&choice_params).map_err(VoteError::Choice)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub enum VoteError {
+    IneligibleVoter,
+    ChoiceType {
+        expected: PollType,
+        actual: PollType,
+    },
+    Signature(VerificationError),
+    Choice(ChoiceVerificationError),
+}
+
+impl fmt::Display for VoteError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::IneligibleVoter => formatter.write_str("voter is not eligible"),
+            Self::ChoiceType { expected, actual } => {
+                write!(
+                    formatter,
+                    "unexpected type of submitted choice: expected {}, got {}",
+                    expected.as_human_string(),
+                    actual.as_human_string()
+                )
+            }
+            Self::Signature(err) => write!(formatter, "cannot verify voter's signature: {}", err),
+            Self::Choice(err) => write!(formatter, "cannot verify choice: {}", err),
+        }
+    }
+}
+
+impl VoteError {
+    fn ensure_choice_type(expected: PollType, actual: PollType) -> Result<(), Self> {
+        if expected == actual {
+            Ok(())
+        } else {
+            Err(Self::ChoiceType { expected, actual })
+        }
+    }
+}
+
+impl StdError for VoteError {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        match self {
+            Self::IneligibleVoter | Self::ChoiceType { .. } => None,
+            Self::Signature(err) => Some(err),
+            Self::Choice(err) => Some(err),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SubmittedVote {
+    #[serde(flatten)]
+    pub inner: Vote,
+    /// Unix timestamp (in milliseconds).
+    pub submitted_at: f64,
+}
+
+impl From<Vote> for SubmittedVote {
+    fn from(vote: Vote) -> Self {
+        Self {
+            inner: vote,
+            submitted_at: Date::now(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum PollStage {
     New,
     AddingParticipants { participants: usize },
+    Voting { votes: usize, participants: usize },
 }
 
 impl PollStage {
-    pub const MAX_INDEX: usize = 1;
+    pub const MAX_INDEX: usize = 2;
 
     pub fn index(&self) -> usize {
         match self {
             Self::New => 0,
             Self::AddingParticipants { .. } => 1,
+            Self::Voting { .. } => 2,
         }
     }
 }
@@ -162,6 +385,9 @@ pub struct PollState {
     pub created_at: f64,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub participants: Vec<Participant>,
+    /// Shared encryption key for the voting. Only present if the set of participants is final.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shared_key: Option<PublicKey<Ristretto>>,
 }
 
 impl PollState {
@@ -170,14 +396,24 @@ impl PollState {
             spec,
             created_at: Date::now(),
             participants: Vec::new(),
+            shared_key: None,
         }
     }
 
     pub fn stage(&self) -> PollStage {
         if self.participants.is_empty() {
             PollStage::New
-        } else {
+        } else if self.shared_key.is_none() {
             PollStage::AddingParticipants {
+                participants: self.participants.len(),
+            }
+        } else {
+            PollStage::Voting {
+                votes: self
+                    .participants
+                    .iter()
+                    .filter(|p| p.vote.is_some())
+                    .count(),
                 participants: self.participants.len(),
             }
         }
@@ -195,11 +431,42 @@ impl PollState {
         }
     }
 
-    pub fn shared_public_key(&self) -> Option<PublicKey<Ristretto>> {
+    pub fn shared_key(&self) -> Option<PublicKey<Ristretto>> {
         self.participants
             .iter()
             .map(|participant| participant.public_key().clone())
             .reduce(ops::Add::add)
+    }
+
+    pub fn finalized_shared_key(&self) -> &PublicKey<Ristretto> {
+        self.shared_key
+            .as_ref()
+            .expect_throw("set of participants is not finalized")
+    }
+
+    pub fn finalize_participants(&mut self) {
+        self.shared_key = self.shared_key();
+    }
+
+    pub fn contains_votes(&self) -> bool {
+        self.participants
+            .iter()
+            .any(|participant| participant.vote.is_some())
+    }
+
+    pub fn insert_vote(&mut self, poll_id: &PollId, vote: Vote) -> Result<(), VoteError> {
+        vote.verify(poll_id, self)?;
+        self.insert_unchecked_vote(vote);
+        Ok(())
+    }
+
+    pub fn insert_unchecked_vote(&mut self, vote: Vote) {
+        let participant = self
+            .participants
+            .iter_mut()
+            .find(|p| *p.public_key() == vote.public_key)
+            .expect("vote does not come from an eligible voter");
+        participant.vote = Some(vote.into());
     }
 }
 
@@ -218,7 +485,7 @@ impl Default for PollManager {
 
 impl PollManager {
     /// Returns ID of the saved poll.
-    pub fn save_poll(&mut self, spec: PollSpec) -> PollId {
+    pub fn create_poll(&mut self, spec: PollSpec) -> PollId {
         let id = PollId::for_spec(&spec);
         let local_storage = local_storage();
         let poll = PollState::new(spec);

@@ -5,7 +5,8 @@ use serde::{
     de::{DeserializeOwned, Error as _, SeqAccess, Visitor},
     Deserializer, Serialize, Serializer,
 };
-use wasm_bindgen::UnwrapThrowExt;
+use wasm_bindgen::{JsCast, UnwrapThrowExt};
+use web_sys::{Event, HtmlInputElement, HtmlTextAreaElement};
 
 use std::{fmt, marker::PhantomData};
 
@@ -76,6 +77,21 @@ pub(crate) fn local_storage() -> web_sys::Storage {
         .local_storage()
         .expect_throw("failed to get LocalStorage")
         .expect_throw("no LocalStorage")
+}
+
+pub(crate) fn value_from_event(event: &Event) -> String {
+    get_event_target::<HtmlTextAreaElement>(event).value()
+}
+
+pub(crate) fn value_from_input_event(event: &Event) -> String {
+    get_event_target::<HtmlInputElement>(event).value()
+}
+
+pub(crate) fn get_event_target<E: JsCast>(event: &Event) -> E {
+    let target = event.target().expect_throw("no target for event");
+    target
+        .dyn_into::<E>()
+        .expect_throw("unexpected target for event")
 }
 
 pub(crate) trait Encode {

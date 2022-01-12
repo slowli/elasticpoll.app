@@ -12,6 +12,11 @@ publish = false
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ["-Os", "--enable-mutable-globals"]
 
+[package.metadata.wasm-pack.profile.dev]
+# This is necessary because webpack does not process long symbols correctly.
+# TODO: better way?
+wasm-opt = ["--strip-debug", "--enable-mutable-globals"]
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 

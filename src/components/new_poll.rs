@@ -1,12 +1,15 @@
 //! New poll wizard page.
 
 use rand_core::{OsRng, RngCore};
-use wasm_bindgen::{JsCast, UnwrapThrowExt};
-use web_sys::{Event, HtmlInputElement, HtmlTextAreaElement};
+use wasm_bindgen::UnwrapThrowExt;
+use web_sys::Event;
 use yew::{classes, html, Callback, Component, Context, Html, Properties};
 
 use super::common::{view_data_row, view_err, Icon, PageMetadata, ValidatedValue};
-use crate::poll::{PollSpec, PollType, MAX_OPTIONS};
+use crate::{
+    poll::{PollSpec, PollType, MAX_OPTIONS},
+    utils::{value_from_event, value_from_input_event},
+};
 
 #[derive(Debug)]
 pub enum NewPollMessage {
@@ -25,43 +28,27 @@ pub enum NewPollMessage {
 
 impl NewPollMessage {
     fn title_set(event: &Event) -> Self {
-        let target = event.target().expect_throw("no target for change event");
-        let target = target
-            .dyn_into::<HtmlInputElement>()
-            .expect_throw("unexpected target for token set event");
-        Self::TitleSet(target.value())
+        Self::TitleSet(value_from_input_event(event))
     }
 
     fn description_set(event: &Event) -> Self {
-        let target = event.target().expect_throw("no target for change event");
-        let target = target
-            .dyn_into::<HtmlTextAreaElement>()
-            .expect_throw("unexpected target for token set event");
-        Self::DescriptionSet(target.value())
+        Self::DescriptionSet(value_from_event(event))
     }
 
     fn option_set(idx: usize, event: &Event) -> Self {
-        let target = event.target().expect_throw("no target for change event");
-        let target = target
-            .dyn_into::<HtmlInputElement>()
-            .expect_throw("unexpected target for token set event");
-        Self::OptionSet(idx, target.value())
+        Self::OptionSet(idx, value_from_input_event(event))
     }
 
     fn type_set(event: &Event) -> Self {
-        let target = event.target().expect_throw("no target for change event");
-        let target = target
-            .dyn_into::<HtmlInputElement>()
-            .expect_throw("unexpected target for token set event");
-        Self::TypeSet(target.value().parse().expect("invalid value"))
+        Self::TypeSet(
+            value_from_input_event(event)
+                .parse()
+                .expect("invalid value"),
+        )
     }
 
     fn spec_set(event: &Event) -> Self {
-        let target = event.target().expect_throw("no target for change event");
-        let target = target
-            .dyn_into::<HtmlTextAreaElement>()
-            .expect_throw("unexpected target for token set event");
-        Self::SpecSet(target.value())
+        Self::SpecSet(value_from_event(event))
     }
 }
 
@@ -627,13 +614,13 @@ impl Component for NewPoll {
                     specification is ready, you can export it to share via a reliable broadcast \
                     channel, for example via Telegram or Slack." }</p>
                 { self.view_tabs(ctx) }
-                <div class="mt-4">
+                <div class="mt-4 text-center">
                     <button
                         type="button"
                         class="btn btn-primary"
                         disabled={is_invalid}
                         onclick={link.callback(|_| NewPollMessage::Done)}>
-                        { Icon::Check.view() }{ " Proceed to participant selection" }
+                        { Icon::Check.view() }{ " Next: participant selection" }
                     </button>
                 </div>
             </>

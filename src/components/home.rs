@@ -96,9 +96,22 @@ impl Home {
             PollStage::AddingParticipants { participants } => {
                 html! {
                     <>
-                        { "Adding participants (" }
+                        { "Adding participants: " }
                         <strong>{ participants.to_string() }</strong>
-                        { ")" }
+                    </>
+                }
+            }
+            PollStage::Voting {
+                votes,
+                participants,
+            } => {
+                html! {
+                    <>
+                        { "Voting: " }
+                        <strong>{ votes.to_string() }</strong>
+                        { " votes / "}
+                        <strong>{ participants.to_string() }</strong>
+                        { " eligible voters" }
                     </>
                 }
             }
