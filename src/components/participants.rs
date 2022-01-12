@@ -5,12 +5,12 @@ use web_sys::{Event, HtmlTextAreaElement};
 use yew::{classes, html, Callback, Component, Context, Html, Properties};
 use yew_router::prelude::*;
 
+use super::{
+    common::{view_data_row, view_err, view_local_timestamp, Icon, PageMetadata, ValidatedValue},
+    Route,
+};
 use crate::{
-    components::{
-        common::{view_data_row, view_err, Icon, PageMetadata, ValidatedValue},
-        Route,
-    },
-    poll::{PollId, PollManager, PollParticipant, PollState, SecretManager},
+    poll::{Participant, ParticipantApplication, PollId, PollManager, PollState, SecretManager},
     utils::Encode,
 };
 
@@ -47,8 +47,8 @@ pub struct Participants {
     poll_manager: PollManager,
     poll_id: PollId,
     poll_state: Option<PollState>,
-    new_participant: ValidatedValue,
-    validated_participant: Option<PollParticipant>,
+    new_application: ValidatedValue,
+    validated_application: Option<ParticipantApplication>,
 }
 
 impl Participants {
@@ -57,10 +57,10 @@ impl Participants {
         state
             .participants
             .iter()
-            .any(|participant| participant.public_key == pk)
+            .any(|participant| *participant.public_key() == pk)
     }
 
-    fn add_participant(&mut self, participant: PollParticipant) {
+    fn add_participant(&mut self, participant: ParticipantApplication) {
         if let Some(state) = &mut self.poll_state {
             state.insert_participant(participant);
             self.poll_manager.update_poll(&self.poll_id, state);
@@ -75,12 +75,13 @@ impl Participants {
     }
 
     fn set_application(&mut self, application: String) {
-        self.validated_participant = None;
+        self.validated_application = None;
 
-        let participant = match serde_json::from_str::<PollParticipant>(&application) {
-            Ok(participant) => participant,
+        let parsed_application = match serde_json::from_str::<ParticipantApplication>(&application)
+        {
+            Ok(application) => application,
             Err(err) => {
-                self.new_participant = ValidatedValue {
+                self.new_application = ValidatedValue {
                     value: application,
                     error_message: Some(format!("Error parsing application: {}", err)),
                 };
@@ -88,18 +89,18 @@ impl Participants {
             }
         };
 
-        self.new_participant = ValidatedValue::unvalidated(application);
-        if let Err(err) = participant.validate(&self.poll_id) {
-            self.new_participant.error_message =
+        self.new_application = ValidatedValue::unvalidated(application);
+        if let Err(err) = parsed_application.validate(&self.poll_id) {
+            self.new_application.error_message =
                 Some(format!("Error validating application: {}", err));
             return;
         }
-        self.validated_participant = Some(participant);
+        self.validated_application = Some(parsed_application);
     }
 
-    fn create_our_participant(&self) -> PollParticipant {
+    fn create_our_participant(&self) -> ParticipantApplication {
         let our_keypair = self.secret_manager.keys_for_poll(&self.poll_id);
-        PollParticipant::new(&our_keypair, &self.poll_id)
+        ParticipantApplication::new(&our_keypair, &self.poll_id)
     }
 
     fn view_poll(&self, state: &PollState, ctx: &Context<Self>) -> Html {
@@ -159,15 +160,10 @@ impl Participants {
         }
     }
 
-    fn view_participant(
-        &self,
-        idx: usize,
-        participant: &PollParticipant,
-        ctx: &Context<Self>,
-    ) -> Html {
+    fn view_participant(&self, idx: usize, participant: &Participant, ctx: &Context<Self>) -> Html {
         let link = ctx.link();
         let our_key = self.secret_manager.public_key_for_poll(&self.poll_id);
-        let our_mark = if participant.public_key == our_key {
+        let our_mark = if *participant.public_key() == our_key {
             html! { <span class="badge bg-primary ms-2">{ "You" }</span> }
         } else {
             html! {}
@@ -201,13 +197,12 @@ impl Participants {
                     </div>
                     <h5 class="card-title">{ "#" }{ &(idx + 1).to_string() }{ our_mark }</h5>
                     <p class="card-subtitle mb-2 small text-muted">
-                        // FIXME: use real date
-                        { "Added on 2022-01-07 13:00:17 UTC" }
+                        { "Added on " }{ view_local_timestamp(participant.created_at) }
                     </p>
                     <p class="card-text mb-0">
                         <strong>{ "Public key:" }</strong>
                         { " " }
-                        { &participant.public_key.encode() }
+                        { participant.public_key().encode() }
                     </p>
                 </div>
             </div>
@@ -233,7 +228,7 @@ impl Participants {
                 <button
                     type="button"
                     class="btn btn-outline-secondary"
-                    disabled={self.validated_participant.is_none()}
+                    disabled={self.validated_application.is_none()}
                     onclick={link.callback(|_| ParticipantsMessage::ParticipantAdded)}>
                     { Icon::Plus.view() }
                     { " Add participant" }
@@ -244,7 +239,7 @@ impl Participants {
 
     fn view_new_participant_form(&self, state: &PollState, ctx: &Context<Self>) -> Html {
         let mut control_classes = classes!["form-control", "font-monospace", "small", "mb-1"];
-        if self.new_participant.error_message.is_some() {
+        if self.new_application.error_message.is_some() {
             control_classes.push("is-invalid");
         }
 
@@ -283,12 +278,12 @@ impl Participants {
                                 id="poll-spec"
                                 class={control_classes}
                                 placeholder="JSON-encoded participant application"
-                                value={self.new_participant.value.clone()}
+                                value={self.new_application.value.clone()}
                                 onchange={link.callback(|evt| {
                                     ParticipantsMessage::application_set(&evt)
                                 })}>
                             </textarea>
-                            { if let Some(err) = &self.new_participant.error_message {
+                            { if let Some(err) = &self.new_application.error_message {
                                 view_err(err)
                             } else {
                                 html!{}
@@ -321,8 +316,8 @@ impl Component for Participants {
             poll_manager: PollManager::default(),
             poll_id: ctx.props().id,
             poll_state,
-            new_participant: ValidatedValue::default(),
-            validated_participant: None,
+            new_application: ValidatedValue::default(),
+            validated_application: None,
         }
     }
 
@@ -335,9 +330,9 @@ impl Component for Participants {
                 self.remove_participant(idx);
             }
             ParticipantsMessage::ParticipantAdded => {
-                if let Some(participant) = self.validated_participant.take() {
+                if let Some(participant) = self.validated_application.take() {
                     self.add_participant(participant);
-                    self.new_participant = ValidatedValue::default();
+                    self.new_application = ValidatedValue::default();
                 }
             }
             ParticipantsMessage::UsAdded => {
@@ -346,8 +341,9 @@ impl Component for Participants {
             }
             ParticipantsMessage::ExportRequested(idx) => {
                 if let Some(state) = &self.poll_state {
-                    let app = serde_json::to_string(&state.participants[idx])
-                        .expect_throw("failed serializing `PollParticipant`");
+                    let app = &state.participants[idx].application;
+                    let app = serde_json::to_string(app)
+                        .expect_throw("failed serializing `ParticipantApplication`");
                     ctx.props().onexport.emit(app);
                 }
                 return false;

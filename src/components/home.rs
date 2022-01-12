@@ -4,7 +4,7 @@ use yew::{classes, html, Component, Context, Html};
 use yew_router::prelude::*;
 
 use super::{
-    common::{Icon, PageMetadata},
+    common::{view_local_timestamp, Icon, PageMetadata},
     Route,
 };
 use crate::poll::{PollId, PollManager, PollStage, PollState};
@@ -66,8 +66,7 @@ impl Home {
 
                     <h5 class="card-title">{ &state.spec.title }</h5>
                     <p class="card-subtitle mb-2 small text-muted">
-                        // FIXME: use real date
-                        { "Added on 2022-01-07 13:00:17 UTC" }
+                        { "Created on " }{ view_local_timestamp(state.created_at) }
                     </p>
 
                     <p class="card-text mb-1">{ Self::view_poll_stage(poll_stage) }</p>

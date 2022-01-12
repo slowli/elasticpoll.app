@@ -1,9 +1,19 @@
 //! Common components.
 
+use js_sys::Date;
 use wasm_bindgen::UnwrapThrowExt;
 use yew::{classes, html, Html};
 
 use crate::poll::{PollSpec, PollType};
+
+pub fn view_local_timestamp(timestamp: f64) -> Html {
+    let date = Date::new(&timestamp.into());
+    html! {
+        <span title="This is a local timestamp; it is not synced among participants">
+            { date.to_utc_string() }
+        </span>
+    }
+}
 
 pub fn view_data_row(label: Html, value: Html) -> Html {
     html! {

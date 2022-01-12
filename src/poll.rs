@@ -1,6 +1,7 @@
 //! Poll data types.
 
 use elastic_elgamal::{group::Ristretto, Keypair, ProofOfPossession, PublicKey};
+use js_sys::Date;
 use merlin::Transcript;
 use rand_core::OsRng;
 use secret_tree::SecretTree;
@@ -87,12 +88,12 @@ impl PollId {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct PollParticipant {
+pub struct ParticipantApplication {
     pub public_key: PublicKey<Ristretto>,
     pub participation_consent: ProofOfPossession<Ristretto>,
 }
 
-impl PollParticipant {
+impl ParticipantApplication {
     pub fn new(keypair: &Keypair<Ristretto>, poll_id: &PollId) -> Self {
         let mut transcript = Transcript::new(b"participation_consent");
         transcript.append_message(b"poll_id", &poll_id.0);
@@ -110,6 +111,29 @@ impl PollParticipant {
         self.participation_consent
             .verify(iter::once(&self.public_key), &mut transcript)
             .map_err(Into::into)
+    }
+}
+
+/// Poll participant (voter / tallier).
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Participant {
+    #[serde(flatten)]
+    pub application: ParticipantApplication,
+    pub created_at: f64,
+}
+
+impl From<ParticipantApplication> for Participant {
+    fn from(application: ParticipantApplication) -> Self {
+        Self {
+            application,
+            created_at: Date::now(),
+        }
+    }
+}
+
+impl Participant {
+    pub fn public_key(&self) -> &PublicKey<Ristretto> {
+        &self.application.public_key
     }
 }
 
@@ -134,14 +158,17 @@ impl PollStage {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PollState {
     pub spec: PollSpec,
+    /// Unix timestamp (in milliseconds).
+    pub created_at: f64,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub participants: Vec<PollParticipant>,
+    pub participants: Vec<Participant>,
 }
 
 impl PollState {
     fn new(spec: PollSpec) -> Self {
         Self {
             spec,
+            created_at: Date::now(),
             participants: Vec::new(),
         }
     }
@@ -156,22 +183,22 @@ impl PollState {
         }
     }
 
-    pub fn insert_participant(&mut self, participant: PollParticipant) {
+    pub fn insert_participant(&mut self, application: ParticipantApplication) {
         let existing_participant = self
             .participants
             .iter_mut()
-            .find(|p| p.public_key == participant.public_key);
+            .find(|p| *p.public_key() == application.public_key);
         if let Some(existing_participant) = existing_participant {
-            *existing_participant = participant;
+            *existing_participant = application.into();
         } else {
-            self.participants.push(participant);
+            self.participants.push(application.into());
         }
     }
 
     pub fn shared_public_key(&self) -> Option<PublicKey<Ristretto>> {
         self.participants
             .iter()
-            .map(|participant| participant.public_key.clone())
+            .map(|participant| participant.public_key().clone())
             .reduce(ops::Add::add)
     }
 }
