@@ -5,6 +5,8 @@ use wasm_bindgen::UnwrapThrowExt;
 use yew::{function_component, html, html::Scope, Callback, Component, Context, Html, Properties};
 use yew_router::prelude::*;
 
+use std::rc::Rc;
+
 mod about;
 mod common;
 mod home;
@@ -17,7 +19,7 @@ use self::{
 };
 use crate::{
     layout,
-    poll::{PollId, PollManager, PollSpec, PollStage, PollState},
+    poll::{PollId, PollManager, PollSpec, PollStage, PollState, SecretManager},
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -67,11 +69,20 @@ impl Route {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Properties)]
+#[derive(Debug, Clone, Default, Properties)]
 pub struct AppProperties {
+    /// Secrets manager.
+    #[prop_or_default]
+    pub secrets: Rc<SecretManager>,
     /// Callback when a value gets exported.
     #[prop_or_default]
     pub onexport: Callback<ExportedData>,
+}
+
+impl PartialEq for AppProperties {
+    fn eq(&self, other: &Self) -> bool {
+        self.onexport == other.onexport && Rc::ptr_eq(&self.secrets, &other.secrets)
+    }
 }
 
 #[derive(Debug)]
@@ -97,7 +108,11 @@ impl Component for App {
             <BrowserRouter>
                 { layout::header() }
                 <div class="container pt-4">
-                    <main><Main onexport={ctx.props().onexport.clone()} /></main>
+                    <main>
+                        <Main
+                            secrets={Rc::clone(&ctx.props().secrets)}
+                            onexport={ctx.props().onexport.clone()} />
+                    </main>
                     { layout::footer() }
                 </div>
             </BrowserRouter>
@@ -138,6 +153,7 @@ impl Main {
                 html! {
                     <Participants
                         id={id}
+                        secrets={Rc::clone(&props.secrets)}
                         onexport={on_participant_export}
                         ondone={link.callback(move |state| {
                             AppMessage::ParticipantsFinalized(id, Box::new(state))
@@ -145,7 +161,7 @@ impl Main {
                 }
             }
             Route::Voting { id } => html! {
-                <Voting id={*id} />
+                <Voting id={*id} secrets={Rc::clone(&props.secrets)} />
             },
         }
     }

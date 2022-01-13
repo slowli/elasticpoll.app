@@ -5,6 +5,8 @@ use web_sys::{Event, HtmlInputElement};
 use yew::{classes, html, Callback, Component, Context, Html, Properties};
 use yew_router::prelude::*;
 
+use std::rc::Rc;
+
 use super::{
     common::{view_data_row, view_err, view_local_timestamp, Icon, PageMetadata, ValidatedValue},
     Route,
@@ -35,18 +37,26 @@ impl VotingMessage {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Properties)]
+#[derive(Debug, Clone, Properties)]
 pub struct VotingProperties {
     pub id: PollId,
+    pub secrets: Rc<SecretManager>,
     #[prop_or_default]
     pub onexport: Callback<String>,
+}
+
+impl PartialEq for VotingProperties {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+            && Rc::ptr_eq(&self.secrets, &other.secrets)
+            && self.onexport == other.onexport
+    }
 }
 
 /// Voting page component.
 #[derive(Debug)]
 pub struct Voting {
     metadata: PageMetadata,
-    secret_manager: SecretManager,
     poll_id: PollId,
     poll_state: Option<PollState>,
     our_choice: Option<VoteChoice>,
@@ -55,16 +65,8 @@ pub struct Voting {
 
 impl Voting {
     fn vote(&self, idx: usize) -> Option<&Vote> {
-        Some(
-            &self
-                .poll_state
-                .as_ref()?
-                .participants
-                .get(idx)?
-                .vote
-                .as_ref()?
-                .inner,
-        )
+        let participants = &self.poll_state.as_ref()?.participants;
+        Some(&participants.get(idx)?.vote.as_ref()?.inner)
     }
 
     fn set_vote(&mut self, vote: String) {
@@ -91,10 +93,10 @@ impl Voting {
         self.new_vote = ValidatedValue::default();
     }
 
-    fn insert_our_vote(&mut self) {
+    fn insert_our_vote(&mut self, ctx: &Context<Self>) {
         if let Some(state) = &mut self.poll_state {
             if let Some(choice) = &self.our_choice {
-                let our_keypair = self.secret_manager.keys_for_poll(&self.poll_id);
+                let our_keypair = ctx.props().secrets.keys_for_poll(&self.poll_id);
                 let vote = Vote::new(&our_keypair, &self.poll_id, state, choice);
                 state.insert_unchecked_vote(vote);
             }
@@ -146,7 +148,7 @@ impl Voting {
         ctx: &Context<Self>,
     ) -> Html {
         let link = ctx.link();
-        let our_key = self.secret_manager.public_key_for_poll(&self.poll_id);
+        let our_key = ctx.props().secrets.public_key_for_poll(&self.poll_id);
         let our_mark = if *participant.public_key() == our_key {
             html! { <span class="badge bg-primary ms-2">{ "You" }</span> }
         } else {
@@ -261,8 +263,7 @@ impl Component for Voting {
             .poll(&poll_id)
             .filter(|state| state.shared_key.is_some());
 
-        let secret_manager = SecretManager::default();
-        let our_key = secret_manager.public_key_for_poll(&poll_id);
+        let our_key = ctx.props().secrets.public_key_for_poll(&poll_id);
         let our_choice = poll_state.as_ref().and_then(|state| {
             let we_are_participant = state
                 .participants
@@ -281,7 +282,6 @@ impl Component for Voting {
                 description: "Allows creating and submitting votes for the poll".to_owned(),
                 is_root: false,
             },
-            secret_manager,
             poll_id,
             poll_state,
             our_choice,
@@ -300,7 +300,7 @@ impl Component for Voting {
                 self.set_vote(vote);
             }
             VotingMessage::OurVoteAdded => {
-                self.insert_our_vote();
+                self.insert_our_vote(ctx);
             }
             VotingMessage::ExportRequested(idx) => {
                 if let Some(vote) = self.vote(idx) {

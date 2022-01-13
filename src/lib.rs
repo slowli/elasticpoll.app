@@ -40,6 +40,7 @@ impl From<&JsAppProperties> for AppProperties {
                     .call1(&JsValue::null(), &value)
                     .expect_throw("failed calling `onexport` callback");
             }),
+            ..Self::default()
         }
     }
 }

@@ -5,6 +5,8 @@ use web_sys::Event;
 use yew::{classes, html, Callback, Component, Context, Html, Properties};
 use yew_router::prelude::*;
 
+use std::rc::Rc;
+
 use super::{
     common::{view_data_row, view_err, view_local_timestamp, Icon, PageMetadata, ValidatedValue},
     Route,
@@ -30,19 +32,28 @@ impl ParticipantsMessage {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Properties)]
+#[derive(Debug, Clone, Properties)]
 pub struct ParticipantsProperties {
     pub id: PollId,
+    pub secrets: Rc<SecretManager>,
     #[prop_or_default]
     pub onexport: Callback<String>,
     #[prop_or_default]
     pub ondone: Callback<PollState>,
 }
 
+impl PartialEq for ParticipantsProperties {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+            && Rc::ptr_eq(&self.secrets, &other.secrets)
+            && self.onexport == other.onexport
+            && self.ondone == other.ondone
+    }
+}
+
 #[derive(Debug)]
 pub struct Participants {
     metadata: PageMetadata,
-    secret_manager: SecretManager,
     poll_manager: PollManager,
     poll_id: PollId,
     poll_state: Option<PollState>,
@@ -51,8 +62,8 @@ pub struct Participants {
 }
 
 impl Participants {
-    fn we_are_participant(&self, state: &PollState) -> bool {
-        let pk = self.secret_manager.public_key_for_poll(&self.poll_id);
+    fn we_are_participant(&self, state: &PollState, ctx: &Context<Self>) -> bool {
+        let pk = ctx.props().secrets.public_key_for_poll(&self.poll_id);
         state
             .participants
             .iter()
@@ -96,8 +107,8 @@ impl Participants {
         self.validated_application = Some(parsed_application);
     }
 
-    fn create_our_participant(&self) -> ParticipantApplication {
-        let our_keypair = self.secret_manager.keys_for_poll(&self.poll_id);
+    fn create_our_participant(&self, ctx: &Context<Self>) -> ParticipantApplication {
+        let our_keypair = ctx.props().secrets.keys_for_poll(&self.poll_id);
         ParticipantApplication::new(&our_keypair, &self.poll_id)
     }
 
@@ -160,7 +171,7 @@ impl Participants {
 
     fn view_participant(&self, idx: usize, participant: &Participant, ctx: &Context<Self>) -> Html {
         let link = ctx.link();
-        let our_key = self.secret_manager.public_key_for_poll(&self.poll_id);
+        let our_key = ctx.props().secrets.public_key_for_poll(&self.poll_id);
         let our_mark = if *participant.public_key() == our_key {
             html! { <span class="badge bg-primary ms-2">{ "You" }</span> }
         } else {
@@ -211,7 +222,7 @@ impl Participants {
         let link = ctx.link();
         html! {
             <div class="mt-3">
-                { if self.we_are_participant(state) {
+                { if self.we_are_participant(state, ctx) {
                     html!{}
                 } else {
                     html! {
@@ -311,7 +322,6 @@ impl Component for Participants {
                     .to_owned(),
                 is_root: false,
             },
-            secret_manager: SecretManager::default(),
             poll_manager: PollManager::default(),
             poll_id: ctx.props().id,
             poll_state,
@@ -335,7 +345,7 @@ impl Component for Participants {
                 }
             }
             ParticipantsMessage::UsAdded => {
-                let us = self.create_our_participant();
+                let us = self.create_our_participant(ctx);
                 self.add_participant(us);
             }
             ParticipantsMessage::ExportRequested(idx) => {
