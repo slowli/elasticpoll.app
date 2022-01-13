@@ -141,7 +141,7 @@ impl PollSpec {
         let onchange = onchange.map(|callback| callback.reform(move |evt| (idx, evt)));
 
         html! {
-            <div class="form-check form-check-inline">
+            <div class="form-check">
                 <input
                     class="form-check-input"
                     type={control_type}

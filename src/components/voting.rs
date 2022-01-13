@@ -57,6 +57,7 @@ impl PartialEq for VotingProperties {
 #[derive(Debug)]
 pub struct Voting {
     metadata: PageMetadata,
+    poll_manager: PollManager,
     poll_id: PollId,
     poll_state: Option<PollState>,
     our_choice: Option<VoteChoice>,
@@ -89,6 +90,7 @@ impl Voting {
                 };
                 return;
             }
+            self.poll_manager.update_poll(&self.poll_id, state);
         }
         self.new_vote = ValidatedValue::default();
     }
@@ -99,6 +101,7 @@ impl Voting {
                 let our_keypair = ctx.props().secrets.keys_for_poll(&self.poll_id);
                 let vote = Vote::new(&our_keypair, &self.poll_id, state, choice);
                 state.insert_unchecked_vote(vote);
+                self.poll_manager.update_poll(&self.poll_id, state);
             }
         }
     }
@@ -282,6 +285,7 @@ impl Component for Voting {
                 description: "Allows creating and submitting votes for the poll".to_owned(),
                 is_root: false,
             },
+            poll_manager,
             poll_id,
             poll_state,
             our_choice,
@@ -304,8 +308,8 @@ impl Component for Voting {
             }
             VotingMessage::ExportRequested(idx) => {
                 if let Some(vote) = self.vote(idx) {
-                    let vote =
-                        serde_json::to_string(vote).expect_throw("failed serializing `Vote`");
+                    let vote = serde_json::to_string_pretty(vote)
+                        .expect_throw("failed serializing `Vote`");
                     ctx.props().onexport.emit(vote);
                 }
                 return false;

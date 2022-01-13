@@ -40,6 +40,7 @@ impl ExportedData {
 pub enum ExportedDataType {
     PollSpec,
     Application,
+    Vote,
 }
 
 /// Application routes.
@@ -137,6 +138,9 @@ impl Main {
         let on_participant_export = props
             .onexport
             .reform(|data| ExportedData::new(ExportedDataType::Application, data));
+        let on_vote_export = props
+            .onexport
+            .reform(|data| ExportedData::new(ExportedDataType::Vote, data));
 
         match route {
             Route::Home => html! { <Home /> },
@@ -161,7 +165,10 @@ impl Main {
                 }
             }
             Route::Voting { id } => html! {
-                <Voting id={*id} secrets={Rc::clone(&props.secrets)} />
+                <Voting
+                    id={*id}
+                    secrets={Rc::clone(&props.secrets)}
+                    onexport={on_vote_export} />
             },
         }
     }

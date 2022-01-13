@@ -351,7 +351,7 @@ impl Component for Participants {
             ParticipantsMessage::ExportRequested(idx) => {
                 if let Some(state) = &self.poll_state {
                     let app = &state.participants[idx].application;
-                    let app = serde_json::to_string(app)
+                    let app = serde_json::to_string_pretty(app)
                         .expect_throw("failed serializing `ParticipantApplication`");
                     ctx.props().onexport.emit(app);
                 }
