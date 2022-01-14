@@ -64,7 +64,7 @@ pub enum Route {
 impl Route {
     pub fn for_poll(id: PollId, stage: PollStage) -> Self {
         match stage {
-            PollStage::AddingParticipants { .. } => Self::PollParticipants { id },
+            PollStage::Participants { .. } => Self::PollParticipants { id },
             PollStage::Voting { .. } => Self::Voting { id },
         }
     }

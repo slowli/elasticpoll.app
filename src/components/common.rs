@@ -201,7 +201,12 @@ impl PollSpec {
     }
 
     fn view_summary(&self) -> Html {
-        self.view(None, None)
+        html! {
+            <>
+                <h5>{ &self.title }</h5>
+                { self.view(None, None) }
+            </>
+        }
     }
 
     pub(super) fn view_as_form(&self, choice: &VoteChoice, onchange: OptionChangeCallback) -> Html {
@@ -221,11 +226,10 @@ impl PollSpec {
             .collect::<Html>();
         html! {
             <>
-                <h5>{ &self.title }</h5>
                 {if self.description.trim().is_empty() {
                     html! { }
                 } else {
-                    html! { <p>{ &self.description }</p> }
+                    html! { <p class="mb-2">{ &self.description }</p> }
                 }}
                 <div>{ options }</div>
             </>

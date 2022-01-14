@@ -345,14 +345,21 @@ impl StdError for VoteError {
 pub struct SubmittedVote {
     #[serde(flatten)]
     pub inner: Vote,
+    /// Vote hash (to sync votes among participants).
+    pub hash: String,
     /// Unix timestamp (in milliseconds).
     pub submitted_at: f64,
 }
 
 impl From<Vote> for SubmittedVote {
     fn from(vote: Vote) -> Self {
+        let json = serde_json::to_string(&vote.choice)
+            .expect_throw("cannot serialize `EncryptedVoteChoice`");
+        let vote_hash = Sha256::digest(&json);
+
         Self {
             inner: vote,
+            hash: base64::encode_config(&vote_hash, base64::URL_SAFE_NO_PAD),
             submitted_at: Date::now(),
         }
     }
@@ -361,7 +368,7 @@ impl From<Vote> for SubmittedVote {
 // TODO: add specification
 #[derive(Debug, Clone, Copy)]
 pub enum PollStage {
-    AddingParticipants { participants: usize },
+    Participants { participants: usize },
     Voting { votes: usize, participants: usize },
 }
 
@@ -372,7 +379,7 @@ impl PollStage {
 
     pub fn index(&self) -> usize {
         match self {
-            Self::AddingParticipants { .. } => Self::PARTICIPANTS_IDX,
+            Self::Participants { .. } => Self::PARTICIPANTS_IDX,
             Self::Voting { .. } => Self::VOTING_IDX,
         }
     }
@@ -381,14 +388,14 @@ impl PollStage {
 /// Ongoing or finished poll state.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PollState {
-    pub spec: PollSpec,
     /// Unix timestamp (in milliseconds).
     pub created_at: f64,
+    spec: PollSpec,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub participants: Vec<Participant>,
+    participants: Vec<Participant>,
     /// Shared encryption key for the voting. Only present if the set of participants is final.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub shared_key: Option<PublicKey<Ristretto>>,
+    shared_key: Option<PublicKey<Ristretto>>,
 }
 
 impl PollState {
@@ -401,9 +408,13 @@ impl PollState {
         }
     }
 
+    pub fn spec(&self) -> &PollSpec {
+        &self.spec
+    }
+
     pub fn stage(&self) -> PollStage {
         if self.shared_key.is_none() {
-            PollStage::AddingParticipants {
+            PollStage::Participants {
                 participants: self.participants.len(),
             }
         } else {
@@ -418,7 +429,16 @@ impl PollState {
         }
     }
 
+    pub fn participants(&self) -> &[Participant] {
+        &self.participants
+    }
+
     pub fn insert_participant(&mut self, application: ParticipantApplication) {
+        assert!(
+            self.shared_key.is_none(),
+            "cannot change participants once they are finalized"
+        );
+
         let existing_participant = self
             .participants
             .iter_mut()
@@ -430,6 +450,14 @@ impl PollState {
         }
     }
 
+    pub fn remove_participant(&mut self, index: usize) {
+        assert!(
+            self.shared_key.is_none(),
+            "cannot change participants once they are finalized"
+        );
+        self.participants.remove(index);
+    }
+
     pub fn shared_key(&self) -> Option<PublicKey<Ristretto>> {
         self.participants
             .iter()
@@ -437,7 +465,7 @@ impl PollState {
             .reduce(ops::Add::add)
     }
 
-    pub fn finalized_shared_key(&self) -> &PublicKey<Ristretto> {
+    fn finalized_shared_key(&self) -> &PublicKey<Ristretto> {
         self.shared_key
             .as_ref()
             .expect_throw("set of participants is not finalized")
@@ -570,7 +598,7 @@ pub struct SecretManager {
 impl Default for SecretManager {
     fn default() -> Self {
         Self {
-            secret: SecretTree::new(&mut OsRng),
+            secret: SecretTree::from_slice(&[11; 32]).unwrap(),
             pk_cache: RefCell::default(),
         }
     }

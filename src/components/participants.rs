@@ -59,6 +59,7 @@ pub struct Participants {
     poll_manager: PollManager,
     poll_id: PollId,
     poll_state: Option<PollState>,
+    is_readonly: bool,
     new_application: ValidatedValue,
     validated_application: Option<ParticipantApplication>,
 }
@@ -67,7 +68,7 @@ impl Participants {
     fn we_are_participant(&self, state: &PollState, ctx: &Context<Self>) -> bool {
         let pk = ctx.props().secrets.public_key_for_poll(&self.poll_id);
         state
-            .participants
+            .participants()
             .iter()
             .any(|participant| *participant.public_key() == pk)
     }
@@ -81,7 +82,7 @@ impl Participants {
 
     fn remove_participant(&mut self, idx: usize) {
         if let Some(state) = &mut self.poll_state {
-            state.participants.remove(idx);
+            state.remove_participant(idx);
             self.poll_manager.update_poll(&self.poll_id, state);
         }
     }
@@ -122,11 +123,11 @@ impl Participants {
                 <p>{ "Participants will act as poll talliers as well. While voting is not \
                     mandatory, tallying is." }</p>
 
-                { state.spec.view_summary_card() }
+                { state.spec().view_summary_card() }
 
                 <h4>{ "Participants" }</h4>
+                { self.view_add_us_form(state, ctx) }
                 { self.view_participants(state, ctx) }
-                { self.view_actions(state, ctx) }
                 { Self::view_shared_key(state) }
             </>
         }
@@ -134,7 +135,7 @@ impl Participants {
 
     fn view_participants(&self, state: &PollState, ctx: &Context<Self>) -> Html {
         let participants: Html = state
-            .participants
+            .participants()
             .iter()
             .enumerate()
             .map(|(idx, participant)| {
@@ -144,9 +145,13 @@ impl Participants {
             .collect();
 
         html! {
-            <div class="row g-2 mb-2">
+            <div class="row g-2 mb-3">
                 { participants }
-                <div class="col-lg-6">{ self.view_new_participant_form(ctx) }</div>
+                { if self.is_readonly {
+                    html!{}
+                } else {
+                    html!{ <div class="col-lg-6">{ self.view_new_participant_form(ctx) }</div> }
+                }}
             </div>
         }
     }
@@ -170,7 +175,8 @@ impl Participants {
         }
 
         let link = ctx.link();
-        card.with_timestamp(participant.created_at)
+        card = card
+            .with_timestamp(participant.created_at)
             .with_button(html! {
                 <button
                     type="button"
@@ -181,8 +187,10 @@ impl Participants {
                     })}>
                     { Icon::Export.view() }{ " Export" }
                 </button>
-            })
-            .with_button(html! {
+            });
+
+        if !self.is_readonly {
+            card = card.with_button(html! {
                 <button
                     type="button"
                     class="btn btn-sm btn-danger"
@@ -192,27 +200,27 @@ impl Participants {
                     })}>
                     { Icon::Remove.view() }{ " Remove" }
                 </button>
-            })
-            .view()
+            });
+        }
+        card.view()
     }
 
-    fn view_actions(&self, state: &PollState, ctx: &Context<Self>) -> Html {
-        let link = ctx.link();
-        html! {
-            <div class="mb-2">
-                { if self.we_are_participant(state, ctx) {
-                    html!{}
-                } else {
-                    html! {
-                        <button
-                            type="button"
-                            class="btn btn-outline-primary me-2"
-                            onclick={link.callback(|_| ParticipantsMessage::UsAdded)}>
-                            { Icon::Plus.view() }{ " Add yourself" }
-                        </button>
-                    }
-                }}
-            </div>
+    fn view_add_us_form(&self, state: &PollState, ctx: &Context<Self>) -> Html {
+        if self.is_readonly || self.we_are_participant(state, ctx) {
+            html! {}
+        } else {
+            let link = ctx.link();
+            html! {
+                <div class="alert alert-warning py-2" role="alert">
+                    { "You are not a vote participant. " }
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-primary align-baseline ms-2"
+                        onclick={link.callback(|_| ParticipantsMessage::UsAdded)}>
+                        { "Add yourself" }
+                    </button>
+                </div>
+            }
         }
     }
 
@@ -281,10 +289,13 @@ impl Component for Participants {
     type Message = ParticipantsMessage;
     type Properties = ParticipantsProperties;
 
-    // FIXME: react to poll state
     fn create(ctx: &Context<Self>) -> Self {
         let poll_manager = PollManager::default();
         let poll_state = poll_manager.poll(&ctx.props().id);
+        let is_readonly = poll_state.as_ref().map_or(true, |state| {
+            !matches!(state.stage(), PollStage::Participants { .. })
+        });
+
         Self {
             metadata: PageMetadata {
                 title: "Configure participants for poll".to_owned(),
@@ -296,6 +307,7 @@ impl Component for Participants {
             poll_manager: PollManager::default(),
             poll_id: ctx.props().id,
             poll_state,
+            is_readonly,
             new_application: ValidatedValue::default(),
             validated_application: None,
         }
@@ -315,7 +327,7 @@ impl Component for Participants {
             }
             ParticipantsMessage::ExportRequested(idx) => {
                 if let Some(state) = &self.poll_state {
-                    let app = &state.participants[idx].application;
+                    let app = &state.participants()[idx].application;
                     let app = serde_json::to_string_pretty(app)
                         .expect_throw("failed serializing `ParticipantApplication`");
                     ctx.props().onexport.emit(app);
@@ -340,15 +352,22 @@ impl Component for Participants {
                     { self.metadata.view() }
                     { state.stage().view_nav(PollStage::PARTICIPANTS_IDX, self.poll_id) }
                     { self.view_poll(state, ctx) }
-                    <div class="mt-4 text-center">
-                        <button
-                            type="button"
-                            class="btn btn-primary"
-                            disabled={state.participants.is_empty()}
-                            onclick={link.callback(|_| ParticipantsMessage::Done)}>
-                            { Icon::Check.view() }{ " Next: voting" }
-                        </button>
-                    </div>
+
+                    { if self.is_readonly {
+                        html!{}
+                    } else {
+                        html! {
+                            <div class="mt-4 text-center">
+                                <button
+                                    type="button"
+                                    class="btn btn-primary"
+                                    disabled={state.participants().is_empty()}
+                                    onclick={link.callback(|_| ParticipantsMessage::Done)}>
+                                    { Icon::Check.view() }{ " Next: voting" }
+                                </button>
+                            </div>
+                        }
+                    }}
                 </>
             }
         } else {

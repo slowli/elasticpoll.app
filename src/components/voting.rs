@@ -67,7 +67,7 @@ pub struct Voting {
 
 impl Voting {
     fn vote(&self, idx: usize) -> Option<&Vote> {
-        let participants = &self.poll_state.as_ref()?.participants;
+        let participants = self.poll_state.as_ref()?.participants();
         Some(&participants.get(idx)?.vote.as_ref()?.inner)
     }
 
@@ -122,7 +122,7 @@ impl Voting {
 
     fn view_votes(&self, state: &PollState, ctx: &Context<Self>) -> Html {
         let votes: Html = state
-            .participants
+            .participants()
             .iter()
             .enumerate()
             .filter_map(|(idx, participant)| {
@@ -152,11 +152,18 @@ impl Voting {
         let mut card = Card::new(
             html! { title },
             html! {
-                <p class="card-text mb-0 text-truncate">
-                    <strong>{ "Voter’s public key:" }</strong>
-                    { " " }
-                    { participant.public_key().encode() }
-                </p>
+                <>
+                    <p class="card-text text-truncate mb-1">
+                        <strong>{ "Vote hash:" }</strong>
+                        { " " }
+                        { &vote.hash }
+                    </p>
+                    <p class="card-text mb-0 text-truncate">
+                        <strong>{ "Voter’s public key:" }</strong>
+                        { " " }
+                        { participant.public_key().encode() }
+                    </p>
+                </>
             },
         );
 
@@ -212,26 +219,27 @@ impl Voting {
         if let Some(choice) = &self.our_choice {
             let link = ctx.link();
             let on_change = link.callback(|(idx, evt)| VotingMessage::option_selected(idx, &evt));
-            html! {
-                <>
-                    <div class="mb-2">{ state.spec.view_as_form(choice, on_change) }</div>
-                    <div>
-                        <button
-                            type="button"
-                            class="btn btn-outline-primary"
-                            onclick={link.callback(|_| VotingMessage::OurVoteAdded)}>
-                            { Icon::Plus.view() }{ " Add your vote" }
-                        </button>
-                    </div>
-                </>
-            }
+            let card = Card::new(
+                html! { &state.spec().title },
+                state.spec().view_as_form(choice, on_change),
+            );
+
+            card.with_button(html! {
+                <button
+                    type="button"
+                    class="btn btn-sm btn-primary"
+                    onclick={link.callback(|_| VotingMessage::OurVoteAdded)}>
+                    { Icon::Plus.view() }{ " Add your vote" }
+                </button>
+            })
+            .view()
         } else {
             html! {
                 <>
                     <div class="alert alert-warning" role="alert">
                         { "You are not a poll participant and cannot vote in this poll." }
                     </div>
-                    { state.spec.view_summary_card() }
+                    { state.spec().view_summary_card() }
                 </>
             }
         }
@@ -247,16 +255,16 @@ impl Component for Voting {
         let poll_id = ctx.props().id;
         let poll_state = poll_manager
             .poll(&poll_id)
-            .filter(|state| state.shared_key.is_some());
+            .filter(|state| matches!(state.stage(), PollStage::Voting { .. }));
 
         let our_key = ctx.props().secrets.public_key_for_poll(&poll_id);
         let our_choice = poll_state.as_ref().and_then(|state| {
             let we_are_participant = state
-                .participants
+                .participants()
                 .iter()
                 .any(|p| *p.public_key() == our_key);
             if we_are_participant {
-                Some(VoteChoice::default(&state.spec))
+                Some(VoteChoice::default(state.spec()))
             } else {
                 None
             }

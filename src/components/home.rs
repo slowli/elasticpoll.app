@@ -53,7 +53,7 @@ impl Home {
 
         let link = ctx.link();
         let card = Card::new(
-            html! { &state.spec.title },
+            html! { &state.spec().title },
             html! {
                 <>
                     <p class="card-text mb-1">{ Self::view_poll_stage(poll_stage) }</p>
@@ -92,7 +92,7 @@ impl Home {
 
     fn view_poll_stage(stage: PollStage) -> Html {
         match stage {
-            PollStage::AddingParticipants { participants } => {
+            PollStage::Participants { participants } => {
                 html! {
                     <>
                         { "Adding participants: " }
