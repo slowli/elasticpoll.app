@@ -13,7 +13,8 @@ use super::{
 };
 use crate::{
     poll::{
-        Participant, PollId, PollManager, PollState, SecretManager, SubmittedVote, Vote, VoteChoice,
+        Participant, PollId, PollManager, PollStage, PollState, SecretManager, SubmittedVote, Vote,
+        VoteChoice,
     },
     utils::{get_event_target, value_from_event, Encode},
 };
@@ -300,6 +301,7 @@ impl Component for Voting {
             html! {
                 <>
                     { self.metadata.view() }
+                    { state.stage().view_nav(PollStage::VOTING_IDX, self.poll_id) }
                     { self.view_poll(state, ctx) }
                     { self.view_vote_submission(state, ctx) }
                     <div class="mt-4 text-center">

@@ -92,7 +92,6 @@ impl Home {
 
     fn view_poll_stage(stage: PollStage) -> Html {
         match stage {
-            PollStage::New => html! { { "Just created" } },
             PollStage::AddingParticipants { participants } => {
                 html! {
                     <>

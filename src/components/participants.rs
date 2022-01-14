@@ -12,7 +12,10 @@ use super::{
     Route,
 };
 use crate::{
-    poll::{Participant, ParticipantApplication, PollId, PollManager, PollState, SecretManager},
+    poll::{
+        Participant, ParticipantApplication, PollId, PollManager, PollStage, PollState,
+        SecretManager,
+    },
     utils::{value_from_event, Encode},
 };
 
@@ -356,6 +359,7 @@ impl Component for Participants {
             html! {
                 <>
                     { self.metadata.view() }
+                    { state.stage().view_nav(PollStage::PARTICIPANTS_IDX, self.poll_id) }
                     { self.view_poll(state, ctx) }
                     <div class="mt-4 text-center">
                         <button

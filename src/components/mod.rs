@@ -64,7 +64,7 @@ pub enum Route {
 impl Route {
     pub fn for_poll(id: PollId, stage: PollStage) -> Self {
         match stage {
-            PollStage::New | PollStage::AddingParticipants { .. } => Self::PollParticipants { id },
+            PollStage::AddingParticipants { .. } => Self::PollParticipants { id },
             PollStage::Voting { .. } => Self::Voting { id },
         }
     }
@@ -108,7 +108,7 @@ impl Component for App {
         html! {
             <BrowserRouter>
                 { layout::header() }
-                <div class="container pt-4">
+                <div class="container">
                     <main>
                         <Main
                             secrets={Rc::clone(&ctx.props().secrets)}

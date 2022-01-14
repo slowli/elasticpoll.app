@@ -358,21 +358,22 @@ impl From<Vote> for SubmittedVote {
     }
 }
 
+// TODO: add specification
 #[derive(Debug, Clone, Copy)]
 pub enum PollStage {
-    New,
     AddingParticipants { participants: usize },
     Voting { votes: usize, participants: usize },
 }
 
 impl PollStage {
-    pub const MAX_INDEX: usize = 2;
+    pub const PARTICIPANTS_IDX: usize = 1;
+    pub const VOTING_IDX: usize = 2;
+    pub const MAX_INDEX: usize = 3;
 
     pub fn index(&self) -> usize {
         match self {
-            Self::New => 0,
-            Self::AddingParticipants { .. } => 1,
-            Self::Voting { .. } => 2,
+            Self::AddingParticipants { .. } => Self::PARTICIPANTS_IDX,
+            Self::Voting { .. } => Self::VOTING_IDX,
         }
     }
 }
@@ -401,9 +402,7 @@ impl PollState {
     }
 
     pub fn stage(&self) -> PollStage {
-        if self.participants.is_empty() {
-            PollStage::New
-        } else if self.shared_key.is_none() {
+        if self.shared_key.is_none() {
             PollStage::AddingParticipants {
                 participants: self.participants.len(),
             }

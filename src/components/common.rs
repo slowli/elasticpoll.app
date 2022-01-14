@@ -4,8 +4,10 @@ use js_sys::Date;
 use wasm_bindgen::UnwrapThrowExt;
 use web_sys::Event;
 use yew::{classes, html, Callback, Html};
+use yew_router::prelude::*;
 
-use crate::poll::{PollSpec, PollType, VoteChoice};
+use super::Route;
+use crate::poll::{PollId, PollSpec, PollStage, PollType, VoteChoice};
 
 fn view_local_timestamp(timestamp: f64) -> Html {
     let date = Date::new(&timestamp.into());
@@ -232,6 +234,53 @@ impl PollSpec {
                     onchange={onchange} />
                 <label class="form-check-label" for={control_id}>{ option }</label>
             </div>
+        }
+    }
+}
+
+impl PollStage {
+    /// Renders navigation for poll stages with the current stage selected.
+    pub(super) fn view_nav(&self, active_idx: usize, id: PollId) -> Html {
+        debug_assert!(self.index() >= active_idx);
+        html! {
+            <ul class="nav mb-3 nav-pills flex-column flex-md-row justify-content-md-center">
+                <li class="nav-item">
+                    <a class="nav-link">{ "1. Specification" }</a>
+                </li>
+                { self.view_nav_item(
+                    1,
+                    active_idx,
+                    Route::PollParticipants { id },
+                    "2. Participants",
+                ) }
+                { self.view_nav_item(
+                    2,
+                    active_idx,
+                    Route::Voting { id },
+                    "3. Voting",
+                ) }
+                <li class="nav-item">
+                    <a class="nav-link disabled">{ "4. Tallying" }</a>
+                </li>
+            </ul>
+        }
+    }
+
+    fn view_nav_item(&self, idx: usize, active_idx: usize, route: Route, name: &str) -> Html {
+        html! {
+            <li class="nav-item">
+                { if self.index() >= idx {
+                    let mut link_classes = classes!["nav-link"];
+                    if active_idx == idx {
+                        link_classes.push("active");
+                    }
+                    html! {
+                        <Link<Route> to={route} classes={link_classes}>{ name }</Link<Route>>
+                    }
+                } else {
+                    html! { <a class="nav-link disabled">{ name }</a> }
+                }}
+            </li>
         }
     }
 }
