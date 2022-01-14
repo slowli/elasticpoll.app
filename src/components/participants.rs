@@ -122,28 +122,7 @@ impl Participants {
                 <p>{ "Participants will act as poll talliers as well. While voting is not \
                     mandatory, tallying is." }</p>
 
-                <div class="accordion mb-3" id="accordion-poll-summary">
-                    <div class="accordion-item">
-                        <h4 class="accordion-header" id="accordion-header-poll-summary">
-                            <button
-                                type="button"
-                                class="accordion-button collapsed"
-                                data-bs-toggle="collapse"
-                                data-bs-target="#accordion-body-poll-summary"
-                                aria-expanded="false"
-                                aria-controls="accordion-body-poll-summary">
-                                { "Poll summary" }
-                            </button>
-                        </h4>
-                        <div id="accordion-body-poll-summary"
-                            class="accordion-collapse collapse"
-                            aria-labelledby="accordion-header-poll-summary"
-                            data-bs-parent="#accordion-poll-summary">
-
-                            <div class="accordion-body">{ state.spec.view_summary() }</div>
-                        </div>
-                    </div>
-                </div>
+                { state.spec.view_summary_card() }
 
                 <h4>{ "Participants" }</h4>
                 { self.view_participants(state, ctx) }

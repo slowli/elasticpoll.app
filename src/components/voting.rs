@@ -134,7 +134,7 @@ impl Voting {
             })
             .collect();
         html! {
-            <div class="row g-2 mb-2">
+            <div class="row g-2 mb-3">
                 { votes }
                 <div class="col-lg-6">{ self.view_new_vote_form(ctx) }</div>
             </div>
@@ -226,8 +226,14 @@ impl Voting {
                 </>
             }
         } else {
-            // TODO: render warning / explanation
-            state.spec.view_summary()
+            html! {
+                <>
+                    <div class="alert alert-warning" role="alert">
+                        { "You are not a poll participant and cannot vote in this poll." }
+                    </div>
+                    { state.spec.view_summary_card() }
+                </>
+            }
         }
     }
 }
@@ -303,7 +309,10 @@ impl Component for Voting {
                     { self.metadata.view() }
                     { state.stage().view_nav(PollStage::VOTING_IDX, self.poll_id) }
                     { self.view_poll(state, ctx) }
+
+                    <h4>{ "Submit vote" }</h4>
                     { self.view_vote_submission(state, ctx) }
+
                     <div class="mt-4 text-center">
                         <button
                             type="button"

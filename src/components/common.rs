@@ -76,7 +76,7 @@ impl Card {
     }
 
     pub fn view(self) -> Html {
-        let mut card_classes = classes!["card"];
+        let mut card_classes = classes!["card", "h-100"];
         if self.dotted_border {
             card_classes.push("border-2");
             card_classes.push("border-dotted");
@@ -173,7 +173,34 @@ impl Icon {
 type OptionChangeCallback = Callback<(usize, Event)>;
 
 impl PollSpec {
-    pub(super) fn view_summary(&self) -> Html {
+    pub(super) fn view_summary_card(&self) -> Html {
+        html! {
+            <div class="accordion mb-3" id="accordion-poll-summary">
+                <div class="accordion-item">
+                    <h4 class="accordion-header" id="accordion-header-poll-summary">
+                        <button
+                            type="button"
+                            class="accordion-button collapsed"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#accordion-body-poll-summary"
+                            aria-expanded="false"
+                            aria-controls="accordion-body-poll-summary">
+                            { "Poll summary" }
+                        </button>
+                    </h4>
+                    <div id="accordion-body-poll-summary"
+                        class="accordion-collapse collapse"
+                        aria-labelledby="accordion-header-poll-summary"
+                        data-bs-parent="#accordion-poll-summary">
+
+                        <div class="accordion-body">{ self.view_summary() }</div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+
+    fn view_summary(&self) -> Html {
         self.view(None, None)
     }
 
