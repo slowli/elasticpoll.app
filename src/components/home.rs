@@ -4,7 +4,7 @@ use yew::{classes, html, Component, Context, Html};
 use yew_router::prelude::*;
 
 use super::{
-    common::{view_local_timestamp, Icon, PageMetadata},
+    common::{Card, Icon, PageMetadata},
     Route,
 };
 use crate::poll::{PollId, PollManager, PollStage, PollState};
@@ -26,13 +26,19 @@ impl Home {
         let polls = self.poll_manager.polls();
         let polls: Html = polls
             .into_iter()
-            .map(|(id, state)| Self::view_poll(id, &state, ctx))
+            .map(|(id, state)| {
+                html! { <div class="col-lg-6">{ Self::view_poll(id, &state, ctx) }</div> }
+            })
             .collect();
         html! {
             <>
-                { polls }
-                <div class="mt-3">
-                    <Link<Route> to={Route::NewPoll} classes={classes!["btn", "btn-primary"]}>
+                <div class="row g-2 mb-2">
+                    { polls }
+                </div>
+                <div>
+                    <Link<Route>
+                        to={Route::NewPoll}
+                        classes={classes!["btn", "btn-outline-primary"]}>
                         {Icon::Plus.view()}{ " Create new poll" }
                     </Link<Route>>
                 </div>
@@ -46,29 +52,10 @@ impl Home {
         let progress_percent = (poll_stage.index() as f64 / PollStage::MAX_INDEX as f64) * 100.0;
 
         let link = ctx.link();
-        html! {
-            <div class="card mb-2">
-                <div class="card-body">
-                    <div class="btn-group btn-group-sm float-end ms-2 mb-2"
-                        role="group"
-                        aria-label="Actions">
-
-                        <button
-                            type="button"
-                            class="btn btn-danger"
-                            title="Remove this poll"
-                            onclick={link.callback(move |_| {
-                                HomeMessage::RemovalRequested(id)
-                            })}>
-                            { Icon::Remove.view() }
-                        </button>
-                    </div>
-
-                    <h5 class="card-title">{ &state.spec.title }</h5>
-                    <p class="card-subtitle mb-2 small text-muted">
-                        { "Created on " }{ view_local_timestamp(state.created_at) }
-                    </p>
-
+        let card = Card::new(
+            html! { &state.spec.title },
+            html! {
+                <>
                     <p class="card-text mb-1">{ Self::view_poll_stage(poll_stage) }</p>
                     <div class="progress mb-2" style="height: 2px;">
                         <div
@@ -80,14 +67,27 @@ impl Home {
                             aria-valuemax={PollStage::MAX_INDEX.to_string()}>
                         </div>
                     </div>
-                    <Link<Route>
-                        to={Route::for_poll(id, poll_stage)}
-                        classes={classes!["card-link"]}>
-                        { "Continue" }
-                    </Link<Route>>
-                </div>
-            </div>
-        }
+                </>
+            },
+        );
+        card.with_timestamp(state.created_at)
+            .with_button(html! {
+                <Link<Route>
+                    to={Route::for_poll(id, poll_stage)}
+                    classes={classes!["btn", "btn-sm", "btn-primary", "me-2"]}>
+                    { "Continue" }
+                </Link<Route>>
+            })
+            .with_button(html! {
+                <button
+                    type="button"
+                    class="btn btn-sm btn-danger"
+                    title="Remove this poll"
+                    onclick={link.callback(move |_| HomeMessage::RemovalRequested(id))}>
+                    { Icon::Remove.view() }{ " Remove" }
+                </button>
+            })
+            .view()
     }
 
     fn view_poll_stage(stage: PollStage) -> Html {

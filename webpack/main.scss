@@ -23,6 +23,10 @@ textarea.form-control {
   }
 }
 
+.border-dotted {
+  border-style: dotted !important;
+}
+
 .body-header {
   color: var(--bs-primary);
   margin-bottom: 2rem;

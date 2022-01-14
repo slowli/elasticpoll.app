@@ -8,7 +8,7 @@ use yew_router::prelude::*;
 use std::rc::Rc;
 
 use super::{
-    common::{view_data_row, view_err, view_local_timestamp, Icon, PageMetadata, ValidatedValue},
+    common::{view_data_row, view_err, Card, Icon, PageMetadata, ValidatedValue},
     Route,
 };
 use crate::{
@@ -20,7 +20,6 @@ use crate::{
 pub enum ParticipantsMessage {
     ApplicationSet(String),
     ParticipantRemoved(usize),
-    ParticipantAdded,
     UsAdded,
     ExportRequested(usize),
     Done,
@@ -104,7 +103,8 @@ impl Participants {
                 Some(format!("Error validating application: {}", err));
             return;
         }
-        self.validated_application = Some(parsed_application);
+        self.add_participant(parsed_application);
+        self.new_application = ValidatedValue::default();
     }
 
     fn create_our_participant(&self, ctx: &Context<Self>) -> ParticipantApplication {
@@ -144,6 +144,8 @@ impl Participants {
 
                 <h4>{ "Participants" }</h4>
                 { self.view_participants(state, ctx) }
+                { self.view_actions(state, ctx) }
+                { Self::view_shared_key(state) }
             </>
         }
     }
@@ -153,75 +155,69 @@ impl Participants {
             .participants
             .iter()
             .enumerate()
-            .map(|(idx, participant)| self.view_participant(idx, participant, ctx))
+            .map(|(idx, participant)| {
+                let card = self.view_participant(idx, participant, ctx);
+                html! { <div class="col-lg-6">{ card }</div> }
+            })
             .collect();
+
         html! {
-            <div class="mb-3">
+            <div class="row g-2 mb-2">
                 { participants }
-                { if state.participants.is_empty() {
-                    html! {
-                        <div class="text-muted"><em>{ "(No participants yet)" }</em></div>
-                    }
-                } else {
-                    html!{}
-                }}
+                <div class="col-lg-6">{ self.view_new_participant_form(ctx) }</div>
             </div>
         }
     }
 
     fn view_participant(&self, idx: usize, participant: &Participant, ctx: &Context<Self>) -> Html {
-        let link = ctx.link();
+        let title = format!("#{}", idx + 1);
+        let mut card = Card::new(
+            html! { title },
+            html! {
+                <p class="card-text mb-0 text-truncate">
+                    <strong>{ "Public key:" }</strong>
+                    { " " }
+                    { participant.public_key().encode() }
+                </p>
+            },
+        );
+
         let our_key = ctx.props().secrets.public_key_for_poll(&self.poll_id);
-        let our_mark = if *participant.public_key() == our_key {
-            html! { <span class="badge bg-primary ms-2">{ "You" }</span> }
-        } else {
-            html! {}
-        };
-
-        html! {
-            <div class="card mb-2">
-                <div class="card-body">
-                    <div class="btn-group btn-group-sm float-end ms-2 mb-2"
-                        role="group"
-                        aria-label="Actions">
-
-                        <button
-                            type="button"
-                            class="btn btn-secondary"
-                            title="Copy participant application to clipboard"
-                            onclick={link.callback(move |_| {
-                                ParticipantsMessage::ExportRequested(idx)
-                            })}>
-                            { Icon::Export.view() }
-                        </button>
-                        <button
-                            type="button"
-                            class="btn btn-danger"
-                            title="Remove this participant"
-                            onclick={link.callback(move |_| {
-                                ParticipantsMessage::ParticipantRemoved(idx)
-                            })}>
-                            { Icon::Remove.view() }
-                        </button>
-                    </div>
-                    <h5 class="card-title">{ "#" }{ &(idx + 1).to_string() }{ our_mark }</h5>
-                    <p class="card-subtitle mb-2 small text-muted">
-                        { "Added on " }{ view_local_timestamp(participant.created_at) }
-                    </p>
-                    <p class="card-text mb-0">
-                        <strong>{ "Public key:" }</strong>
-                        { " " }
-                        { participant.public_key().encode() }
-                    </p>
-                </div>
-            </div>
+        if *participant.public_key() == our_key {
+            card = card.with_our_mark();
         }
+
+        let link = ctx.link();
+        card.with_timestamp(participant.created_at)
+            .with_button(html! {
+                <button
+                    type="button"
+                    class="btn btn-sm btn-secondary me-2"
+                    title="Copy participant application to clipboard"
+                    onclick={link.callback(move |_| {
+                        ParticipantsMessage::ExportRequested(idx)
+                    })}>
+                    { Icon::Export.view() }{ " Export" }
+                </button>
+            })
+            .with_button(html! {
+                <button
+                    type="button"
+                    class="btn btn-sm btn-danger"
+                    title="Remove this participant"
+                    onclick={link.callback(move |_| {
+                        ParticipantsMessage::ParticipantRemoved(idx)
+                    })}>
+                    { Icon::Remove.view() }{ " Remove" }
+                </button>
+            })
+            .view()
     }
 
     fn view_actions(&self, state: &PollState, ctx: &Context<Self>) -> Html {
         let link = ctx.link();
         html! {
-            <div class="mt-3">
+            <div class="mb-2">
                 { if self.we_are_participant(state, ctx) {
                     html!{}
                 } else {
@@ -234,74 +230,67 @@ impl Participants {
                         </button>
                     }
                 }}
-                <button
-                    type="button"
-                    class="btn btn-outline-secondary"
-                    disabled={self.validated_application.is_none()}
-                    onclick={link.callback(|_| ParticipantsMessage::ParticipantAdded)}>
-                    { Icon::Plus.view() }
-                    { " Add participant" }
-                </button>
             </div>
         }
     }
 
-    fn view_new_participant_form(&self, state: &PollState, ctx: &Context<Self>) -> Html {
+    fn view_new_participant_form(&self, ctx: &Context<Self>) -> Html {
         let mut control_classes = classes!["form-control", "font-monospace", "small", "mb-1"];
         if self.new_application.error_message.is_some() {
             control_classes.push("is-invalid");
         }
 
         let link = ctx.link();
+        let card = Card::new(
+            html! {
+                <label for="participant-application">{ "New participant" }</label>
+            },
+            html! {
+                <form>
+                    <textarea
+                        id="participant-application"
+                        class={control_classes}
+                        placeholder="JSON-encoded participant application"
+                        value={self.new_application.value.clone()}
+                        onchange={link.callback(|evt| {
+                            ParticipantsMessage::application_set(&evt)
+                        })}>
+                    </textarea>
+                    { if let Some(err) = &self.new_application.error_message {
+                        view_err(err)
+                    } else {
+                        html!{}
+                    }}
+                </form>
+            },
+        );
+        card.with_dotted_border().view()
+    }
+
+    fn view_shared_key(state: &PollState) -> Html {
         html! {
-            <form>
-                { if let Some(shared_key) = state.shared_key() {
-                    view_data_row(
-                        html! {
-                            <label for="shared-key"><strong>{ "Shared key" }</strong></label>
-                        },
-                        html! {
-                            <>
-                            <p id="shared-key" class="mb-1">{ shared_key.encode() }</p>
+            { if let Some(shared_key) = state.shared_key() {
+                view_data_row(
+                    html! {
+                        <label for="shared-key"><strong>{ "Shared key" }</strong></label>
+                    },
+                    html! {
+                        <>
+                            <p id="shared-key" class="mb-1 text-truncate">
+                                { shared_key.encode() }
+                            </p>
                             <p class="small text-muted">
                                 { "The order of participants does not matter and can differ for \
                                 different participants. However, this shared public key \
                                 must be the same across all participants before proceeding \
                                 to the next step." }
                             </p>
-                            </>
-                        },
-                    )
-                } else {
-                    html!{}
-                }}
-                { view_data_row(
-                    html! {
-                        <label for="participant-application">
-                            <strong>{ "Participant application" }</strong>
-                        </label>
-                    },
-                    html! {
-                        <>
-                            <textarea
-                                id="participant-application"
-                                class={control_classes}
-                                placeholder="JSON-encoded participant application"
-                                value={self.new_application.value.clone()}
-                                onchange={link.callback(|evt| {
-                                    ParticipantsMessage::application_set(&evt)
-                                })}>
-                            </textarea>
-                            { if let Some(err) = &self.new_application.error_message {
-                                view_err(err)
-                            } else {
-                                html!{}
-                            }}
                         </>
                     },
-                )}
-                { self.view_actions(state, ctx) }
-            </form>
+                )
+            } else {
+                html!{}
+            }}
         }
     }
 }
@@ -338,12 +327,6 @@ impl Component for Participants {
             ParticipantsMessage::ParticipantRemoved(idx) => {
                 self.remove_participant(idx);
             }
-            ParticipantsMessage::ParticipantAdded => {
-                if let Some(participant) = self.validated_application.take() {
-                    self.add_participant(participant);
-                    self.new_application = ValidatedValue::default();
-                }
-            }
             ParticipantsMessage::UsAdded => {
                 let us = self.create_our_participant(ctx);
                 self.add_participant(us);
@@ -374,7 +357,6 @@ impl Component for Participants {
                 <>
                     { self.metadata.view() }
                     { self.view_poll(state, ctx) }
-                    { self.view_new_participant_form(state, ctx) }
                     <div class="mt-4 text-center">
                         <button
                             type="button"

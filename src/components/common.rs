@@ -7,7 +7,7 @@ use yew::{classes, html, Callback, Html};
 
 use crate::poll::{PollSpec, PollType, VoteChoice};
 
-pub fn view_local_timestamp(timestamp: f64) -> Html {
+fn view_local_timestamp(timestamp: f64) -> Html {
     let date = Date::new(&timestamp.into());
     html! {
         <span title="This is a local timestamp; it is not synced among participants">
@@ -16,7 +16,7 @@ pub fn view_local_timestamp(timestamp: f64) -> Html {
     }
 }
 
-pub fn view_data_row(label: Html, value: Html) -> Html {
+pub(super) fn view_data_row(label: Html, value: Html) -> Html {
     html! {
         <div class="row mb-1">
             <div class="col-md-4 col-lg-3">{ label }</div>
@@ -25,9 +25,88 @@ pub fn view_data_row(label: Html, value: Html) -> Html {
     }
 }
 
-pub fn view_err(message: &str) -> Html {
+pub(super) fn view_err(message: &str) -> Html {
     html! {
         <p class="invalid-feedback mb-1">{ message }</p>
+    }
+}
+
+#[derive(Debug)]
+pub(super) struct Card {
+    our_mark: bool,
+    dotted_border: bool,
+    title: Html,
+    timestamp: Option<f64>,
+    body: Html,
+    buttons: Vec<Html>,
+}
+
+impl Card {
+    pub fn new(title: Html, body: Html) -> Self {
+        Self {
+            our_mark: false,
+            dotted_border: false,
+            title,
+            timestamp: None,
+            body,
+            buttons: vec![],
+        }
+    }
+
+    pub fn with_our_mark(mut self) -> Self {
+        self.our_mark = true;
+        self
+    }
+
+    pub fn with_dotted_border(mut self) -> Self {
+        self.dotted_border = true;
+        self
+    }
+
+    pub fn with_timestamp(mut self, timestamp: f64) -> Self {
+        self.timestamp = Some(timestamp);
+        self
+    }
+
+    pub fn with_button(mut self, button: Html) -> Self {
+        self.buttons.push(button);
+        self
+    }
+
+    pub fn view(self) -> Html {
+        let mut card_classes = classes!["card"];
+        if self.dotted_border {
+            card_classes.push("border-2");
+            card_classes.push("border-dotted");
+        }
+        let our_mark = if self.our_mark {
+            html! { <span class="badge bg-primary position-absolute ms-2">{ "You" }</span> }
+        } else {
+            html! {}
+        };
+
+        html! {
+            <div class={card_classes}>
+                <div class="card-body">
+                    <h5 class="card-title text-truncate">{ self.title }{ our_mark }</h5>
+                    { if let Some(timestamp) = self.timestamp {
+                        html! {
+                            <p class="card-subtitle mb-2 small text-muted">
+                                { "Created on " }{ view_local_timestamp(timestamp) }
+                            </p>
+                        }
+                    } else {
+                        html!{}
+                    }}
+                    { self.body }
+                </div>
+                { if self.buttons.is_empty() {
+                    html!{}
+                } else {
+                    html! { <div class="card-footer">{ for self.buttons }</div> }
+                }}
+            </div>
+        }
     }
 }
 

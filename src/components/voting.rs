@@ -8,7 +8,7 @@ use yew_router::prelude::*;
 use std::rc::Rc;
 
 use super::{
-    common::{view_data_row, view_err, view_local_timestamp, Icon, PageMetadata, ValidatedValue},
+    common::{view_err, Card, Icon, PageMetadata, ValidatedValue},
     Route,
 };
 use crate::{
@@ -126,19 +126,16 @@ impl Voting {
             .enumerate()
             .filter_map(|(idx, participant)| {
                 let vote = participant.vote.as_ref();
-                vote.map(|vote| self.view_vote(idx, participant, vote, ctx))
+                vote.map(|vote| {
+                    let vote = self.view_vote(idx, participant, vote, ctx);
+                    html! { <div class="col-lg-6">{ vote }</div> }
+                })
             })
             .collect();
         html! {
-            <div class="mb-3">
+            <div class="row g-2 mb-2">
                 { votes }
-                { if state.contains_votes() {
-                    html!{}
-                } else {
-                    html! {
-                        <div class="text-muted"><em>{ "(No votes submitted yet)" }</em></div>
-                    }
-                }}
+                <div class="col-lg-6">{ self.view_new_vote_form(ctx) }</div>
             </div>
         }
     }
@@ -150,88 +147,67 @@ impl Voting {
         vote: &SubmittedVote,
         ctx: &Context<Self>,
     ) -> Html {
-        let link = ctx.link();
+        let title = format!("Voter #{}", idx + 1);
+        let mut card = Card::new(
+            html! { title },
+            html! {
+                <p class="card-text mb-0 text-truncate">
+                    <strong>{ "Voter’s public key:" }</strong>
+                    { " " }
+                    { participant.public_key().encode() }
+                </p>
+            },
+        );
+
         let our_key = ctx.props().secrets.public_key_for_poll(&self.poll_id);
-        let our_mark = if *participant.public_key() == our_key {
-            html! { <span class="badge bg-primary ms-2">{ "You" }</span> }
-        } else {
-            html! {}
-        };
-
-        html! {
-            <div class="card mb-2">
-                <div class="card-body">
-                    <div class="btn-group btn-group-sm float-end ms-2 mb-2"
-                        role="group"
-                        aria-label="Actions">
-
-                        <button
-                            type="button"
-                            class="btn btn-secondary"
-                            title="Copy vote to clipboard"
-                            onclick={link.callback(move |_| {
-                                VotingMessage::ExportRequested(idx)
-                            })}>
-                            { Icon::Export.view() }
-                        </button>
-                    </div>
-                    <h5 class="card-title">{ "Voter #" }{ &(idx + 1).to_string() }{ our_mark }</h5>
-                    <p class="card-subtitle mb-2 small text-muted">
-                        { "Submitted on " }{ view_local_timestamp(vote.submitted_at) }
-                    </p>
-                    <p class="card-text mb-0">
-                        <strong>{ "Voter’s public key:" }</strong>
-                        { " " }
-                        { participant.public_key().encode() }
-                    </p>
-                </div>
-            </div>
+        if *participant.public_key() == our_key {
+            card = card.with_our_mark();
         }
+
+        let link = ctx.link();
+        card.with_timestamp(vote.submitted_at)
+            .with_button(html! {
+                <button
+                    type="button"
+                    class="btn btn-sm btn-secondary"
+                    title="Copy vote to clipboard"
+                    onclick={link.callback(move |_| VotingMessage::ExportRequested(idx))}>
+                    { Icon::Export.view() }{ " Export" }
+                </button>
+            })
+            .view()
     }
 
-    fn view_new_vote_form(&self, state: &PollState, ctx: &Context<Self>) -> Html {
+    fn view_new_vote_form(&self, ctx: &Context<Self>) -> Html {
         let mut control_classes = classes!["form-control", "font-monospace", "small", "mb-1"];
         if self.new_vote.error_message.is_some() {
             control_classes.push("is-invalid");
         }
 
         let link = ctx.link();
-        html! {
-            <form>
-                { view_data_row(
-                    html! {
-                        <label for="encoded-vote">
-                            <strong>{ "Vote" }</strong>
-                        </label>
-                    },
-                    html! {
-                        <>
-                            <textarea
-                                id="encoded-vote"
-                                class={control_classes}
-                                placeholder="JSON-encoded vote"
-                                value={self.new_vote.value.clone()}
-                                onchange={link.callback(|evt| {
-                                    VotingMessage::vote_set(&evt)
-                                })}>
-                            </textarea>
-                            { if let Some(err) = &self.new_vote.error_message {
-                                view_err(err)
-                            } else {
-                                html!{}
-                            }}
-                            <p class="small text-muted">
-                                { "Vote will be added to the poll automatically if it is valid" }
-                            </p>
-                        </>
-                    },
-                )}
-                { self.view_actions(state, ctx) }
-            </form>
-        }
+        let card = Card::new(
+            html! { <label for="encoded-vote">{ "New vote" }</label> },
+            html! {
+                <form>
+                    <textarea
+                        id="encoded-vote"
+                        class={control_classes}
+                        placeholder="JSON-encoded vote"
+                        value={self.new_vote.value.clone()}
+                        onchange={link.callback(|evt| VotingMessage::vote_set(&evt))}>
+                    </textarea>
+                    { if let Some(err) = &self.new_vote.error_message {
+                        view_err(err)
+                    } else {
+                        html!{}
+                    }}
+                </form>
+            },
+        );
+        card.with_dotted_border().view()
     }
 
-    fn view_actions(&self, state: &PollState, ctx: &Context<Self>) -> Html {
+    fn view_vote_submission(&self, state: &PollState, ctx: &Context<Self>) -> Html {
         if let Some(choice) = &self.our_choice {
             let link = ctx.link();
             let on_change = link.callback(|(idx, evt)| VotingMessage::option_selected(idx, &evt));
@@ -325,7 +301,7 @@ impl Component for Voting {
                 <>
                     { self.metadata.view() }
                     { self.view_poll(state, ctx) }
-                    { self.view_new_vote_form(state, ctx) }
+                    { self.view_vote_submission(state, ctx) }
                     <div class="mt-4 text-center">
                         <button
                             type="button"
