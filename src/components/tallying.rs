@@ -9,6 +9,7 @@ use super::{
     common::{view_err, Card, Icon, PageMetadata, PollStageProperties, ValidatedValue},
     Route,
 };
+use crate::components::common::view_data_row;
 use crate::{
     poll::{
         Participant, PollId, PollManager, PollStage, PollState, SubmittedTallierShare, TallierShare,
@@ -174,6 +175,53 @@ impl Tallying {
         );
         card.with_dotted_border().view()
     }
+
+    fn view_results(state: &PollState, results: &[u64]) -> Html {
+        let total_votes = results.iter().copied().sum::<u64>();
+        let options = state.spec().options.iter().zip(results);
+        let results: Html = options
+            .map(|(option, &votes)| Self::view_option_result(option, votes, total_votes))
+            .collect();
+        html! {
+            <>
+                <h4>{ "Vote results" }</h4>
+                <h5 class="text-muted">{ &state.spec().title }</h5>
+                { if state.spec().description.trim().is_empty() {
+                    html!{}
+                } else {
+                    html! { <p>{ &state.spec().description }</p> }
+                }}
+                { results }
+            </>
+        }
+    }
+
+    #[allow(clippy::cast_precision_loss)]
+    fn view_option_result(option: &str, votes: u64, total_votes: u64) -> Html {
+        let progress_percent = if total_votes == 0 {
+            0.0
+        } else {
+            votes as f64 * 100.0 / total_votes as f64
+        };
+        view_data_row(
+            html! { <strong>{ option }</strong> },
+            html! {
+                <>
+                    <p class="mb-1">{ format!("{} votes ({:.0}%)", votes, progress_percent) }</p>
+                    <div class="progress">
+                        <div
+                            class="progress-bar"
+                            role="progressbar"
+                            style={format!("width: {:.2}%", progress_percent)}
+                            aria-valuenow={progress_percent.to_string()}
+                            aria-valuemin="0"
+                            aria-valuemax="100">
+                        </div>
+                    </div>
+                </>
+            },
+        )
+    }
 }
 
 impl Component for Tallying {
@@ -226,6 +274,11 @@ impl Component for Tallying {
                     { self.metadata.view() }
                     { state.stage().view_nav(PollStage::TALLYING_IDX, self.poll_id) }
                     { self.view_poll(state, ctx) }
+                    { if let Some(results) = state.results() {
+                        Self::view_results(state, results)
+                    } else {
+                        html!{}
+                    }}
                 </>
             }
         } else {

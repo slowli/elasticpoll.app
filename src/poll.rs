@@ -4,7 +4,8 @@ use elastic_elgamal::{
     app::{ChoiceParams, ChoiceVerificationError, EncryptedChoice, MultiChoice, SingleChoice},
     group::Ristretto,
     sharing::{CandidateShare, DecryptionShare},
-    Ciphertext, Keypair, LogEqualityProof, ProofOfPossession, PublicKey, VerificationError,
+    Ciphertext, DiscreteLogTable, Keypair, LogEqualityProof, ProofOfPossession, PublicKey,
+    VerificationError,
 };
 use js_sys::Date;
 use merlin::Transcript;
@@ -553,7 +554,6 @@ impl PollStage {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
 enum TallyResult {
     InProgress,
     Finished(Vec<u64>),
@@ -734,6 +734,36 @@ impl PollState {
             .find(|p| *p.public_key() == share.public_key)
             .expect("vote does not come from an eligible voter");
         participant.tallier_share = Some(share.into());
+
+        let all_shares_are_collected = self.participants.iter().all(|p| p.tallier_share.is_some());
+        if all_shares_are_collected {
+            let mut blinded_elements: Vec<_> = self
+                .cumulative_choices()
+                .into_iter()
+                .map(|ciphertext| *ciphertext.blinded_element())
+                .collect();
+            for participant in &self.participants {
+                let share = &participant.tallier_share.as_ref().unwrap_throw().inner;
+                for (dest, src) in blinded_elements.iter_mut().zip(&share.shares) {
+                    *dest -= src.share.into_unchecked().as_element();
+                }
+            }
+
+            let table = DiscreteLogTable::<Ristretto>::new(0..=self.participants.len() as u64);
+            let decrypted_choices = blinded_elements
+                .into_iter()
+                .map(|elt| table.get(&elt).expect("cannot decrypt"))
+                .collect();
+            self.tally_result = Some(TallyResult::Finished(decrypted_choices));
+        }
+    }
+
+    pub fn results(&self) -> Option<&[u64]> {
+        if let Some(TallyResult::Finished(results)) = &self.tally_result {
+            Some(results)
+        } else {
+            None
+        }
     }
 }
 
