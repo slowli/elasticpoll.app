@@ -70,12 +70,18 @@ impl Home {
                 </>
             },
         );
+
+        let continue_text = if matches!(poll_stage, PollStage::Finished) {
+            "View results"
+        } else {
+            "Continue"
+        };
         card.with_timestamp(state.created_at)
             .with_button(html! {
                 <Link<Route>
                     to={Route::for_poll(id, poll_stage)}
                     classes={classes!["btn", "btn-sm", "btn-primary", "me-2"]}>
-                    { "Continue" }
+                    { continue_text }
                 </Link<Route>>
             })
             .with_button(html! {

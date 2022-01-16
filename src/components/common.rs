@@ -278,7 +278,7 @@ impl PollStage {
         html! {
             <ul class="nav mb-3 nav-pills flex-column flex-md-row justify-content-md-center">
                 <li class="nav-item">
-                    <a class="nav-link">{ "1. Specification" }</a>
+                    <a class="nav-link disabled">{ "1. Specification" }</a>
                 </li>
                 { self.view_nav_item(
                     1,
@@ -292,9 +292,12 @@ impl PollStage {
                     Route::Voting { id },
                     "3. Voting",
                 ) }
-                <li class="nav-item">
-                    <a class="nav-link disabled">{ "4. Tallying" }</a>
-                </li>
+                { self.view_nav_item(
+                    3,
+                    active_idx,
+                    Route::Tallying { id },
+                    "4. Tallying",
+                ) }
             </ul>
         }
     }
