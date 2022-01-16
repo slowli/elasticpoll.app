@@ -95,8 +95,8 @@ impl Home {
             PollStage::Participants { participants } => {
                 html! {
                     <>
-                        { "Adding participants: " }
-                        <strong>{ participants.to_string() }</strong>
+                        <strong>{ "Adding participants:" }</strong>
+                        { format!(" {}", participants) }
                     </>
                 }
             }
@@ -106,13 +106,24 @@ impl Home {
             } => {
                 html! {
                     <>
-                        { "Voting: " }
-                        <strong>{ votes.to_string() }</strong>
-                        { " votes / "}
-                        <strong>{ participants.to_string() }</strong>
-                        { " eligible voters" }
+                        <strong>{ "Voting:" }</strong>
+                        { format!(" {} votes / {} eligible voters", votes, participants) }
                     </>
                 }
+            }
+            PollStage::Tallying {
+                shares,
+                participants,
+            } => {
+                html! {
+                    <>
+                        <strong>{ "Tallying:" }</strong>
+                        { format!(" {} shares / {} talliers", shares, participants) }
+                    </>
+                }
+            }
+            PollStage::Finished => {
+                html! { <strong>{ "Finished" }</strong> }
             }
         }
     }

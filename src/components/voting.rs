@@ -2,19 +2,16 @@
 
 use wasm_bindgen::UnwrapThrowExt;
 use web_sys::{Event, HtmlInputElement};
-use yew::{classes, html, Callback, Component, Context, Html, Properties};
+use yew::{classes, html, Component, Context, Html};
 use yew_router::prelude::*;
 
-use std::rc::Rc;
-
 use super::{
-    common::{view_err, Card, Icon, PageMetadata, ValidatedValue},
+    common::{view_err, Card, Icon, PageMetadata, PollStageProperties, ValidatedValue},
     Route,
 };
 use crate::{
     poll::{
-        Participant, PollId, PollManager, PollStage, PollState, SecretManager, SubmittedVote, Vote,
-        VoteChoice,
+        Participant, PollId, PollManager, PollStage, PollState, SubmittedVote, Vote, VoteChoice,
     },
     utils::{get_event_target, value_from_event, Encode},
 };
@@ -25,6 +22,7 @@ pub enum VotingMessage {
     VoteSet(String),
     OurVoteAdded,
     ExportRequested(usize),
+    Done,
 }
 
 impl VotingMessage {
@@ -38,22 +36,6 @@ impl VotingMessage {
     }
 }
 
-#[derive(Debug, Clone, Properties)]
-pub struct VotingProperties {
-    pub id: PollId,
-    pub secrets: Rc<SecretManager>,
-    #[prop_or_default]
-    pub onexport: Callback<String>,
-}
-
-impl PartialEq for VotingProperties {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-            && Rc::ptr_eq(&self.secrets, &other.secrets)
-            && self.onexport == other.onexport
-    }
-}
-
 /// Voting page component.
 #[derive(Debug)]
 pub struct Voting {
@@ -61,6 +43,7 @@ pub struct Voting {
     poll_manager: PollManager,
     poll_id: PollId,
     poll_state: Option<PollState>,
+    is_readonly: bool,
     our_choice: Option<VoteChoice>,
     new_vote: ValidatedValue,
 }
@@ -136,7 +119,11 @@ impl Voting {
         html! {
             <div class="row g-2 mb-3">
                 { votes }
-                <div class="col-lg-6">{ self.view_new_vote_form(ctx) }</div>
+                { if self.is_readonly {
+                    html!{}
+                } else {
+                    html! { <div class="col-lg-6">{ self.view_new_vote_form(ctx) }</div> }
+                }}
             </div>
         }
     }
@@ -248,14 +235,15 @@ impl Voting {
 
 impl Component for Voting {
     type Message = VotingMessage;
-    type Properties = VotingProperties;
+    type Properties = PollStageProperties;
 
     fn create(ctx: &Context<Self>) -> Self {
         let poll_manager = PollManager::default();
         let poll_id = ctx.props().id;
-        let poll_state = poll_manager
-            .poll(&poll_id)
-            .filter(|state| matches!(state.stage(), PollStage::Voting { .. }));
+        let poll_state = poll_manager.poll(&poll_id);
+        let is_readonly = poll_state.as_ref().map_or(true, |state| {
+            !matches!(state.stage(), PollStage::Voting { .. })
+        });
 
         let our_key = ctx.props().secrets.public_key_for_poll(&poll_id);
         let our_choice = poll_state.as_ref().and_then(|state| {
@@ -279,6 +267,7 @@ impl Component for Voting {
             poll_manager,
             poll_id,
             poll_state,
+            is_readonly,
             our_choice,
             new_vote: ValidatedValue::default(),
         }
@@ -305,6 +294,11 @@ impl Component for Voting {
                 }
                 return false;
             }
+            VotingMessage::Done => {
+                let state = self.poll_state.take().expect_throw("no poll state");
+                ctx.props().ondone.emit(state);
+                return false; // There will be a redirect; no need to re-render this page.
+            }
         }
         true
     }
@@ -318,17 +312,27 @@ impl Component for Voting {
                     { state.stage().view_nav(PollStage::VOTING_IDX, self.poll_id) }
                     { self.view_poll(state, ctx) }
 
-                    <h4>{ "Submit vote" }</h4>
-                    { self.view_vote_submission(state, ctx) }
+                    { if self.is_readonly {
+                        html!{}
+                    } else {
+                        let link = ctx.link();
+                        html! {
+                            <>
+                                <h4>{ "Submit vote" }</h4>
+                                { self.view_vote_submission(state, ctx) }
 
-                    <div class="mt-4 text-center">
-                        <button
-                            type="button"
-                            class="btn btn-primary"
-                            disabled={no_votes}>
-                            { Icon::Check.view() }{ " Next: tallying" }
-                        </button>
-                    </div>
+                                <div class="mt-4 text-center">
+                                    <button
+                                        type="button"
+                                        class="btn btn-primary"
+                                        disabled={no_votes}
+                                        onclick={link.callback(|_| VotingMessage::Done)}>
+                                        { Icon::Check.view() }{ " Next: tallying" }
+                                    </button>
+                                </div>
+                            </>
+                        }
+                    }}
                 </>
             }
         } else {

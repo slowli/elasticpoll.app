@@ -3,11 +3,13 @@
 use js_sys::Date;
 use wasm_bindgen::UnwrapThrowExt;
 use web_sys::Event;
-use yew::{classes, html, Callback, Html};
+use yew::{classes, html, Callback, Html, Properties};
 use yew_router::prelude::*;
 
+use std::rc::Rc;
+
 use super::Route;
-use crate::poll::{PollId, PollSpec, PollStage, PollType, VoteChoice};
+use crate::poll::{PollId, PollSpec, PollStage, PollState, PollType, SecretManager, VoteChoice};
 
 fn view_local_timestamp(timestamp: f64) -> Html {
     let date = Date::new(&timestamp.into());
@@ -360,5 +362,25 @@ impl PageMetadata {
             title = self.title,
             description = self.description
         )
+    }
+}
+
+/// Properties for vote stage pages.
+#[derive(Debug, Clone, Properties)]
+pub struct PollStageProperties {
+    pub id: PollId,
+    pub secrets: Rc<SecretManager>,
+    #[prop_or_default]
+    pub onexport: Callback<String>,
+    #[prop_or_default]
+    pub ondone: Callback<PollState>,
+}
+
+impl PartialEq for PollStageProperties {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+            && Rc::ptr_eq(&self.secrets, &other.secrets)
+            && self.onexport == other.onexport
+            && self.ondone == other.ondone
     }
 }

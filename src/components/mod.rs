@@ -12,14 +12,16 @@ mod common;
 mod home;
 mod new_poll;
 mod participants;
+mod tallying;
 mod voting;
 
 use self::{
-    about::About, home::Home, new_poll::NewPoll, participants::Participants, voting::Voting,
+    about::About, home::Home, new_poll::NewPoll, participants::Participants, tallying::Tallying,
+    voting::Voting,
 };
 use crate::{
     layout,
-    poll::{PollId, PollManager, PollSpec, PollStage, PollState, SecretManager},
+    poll::{PollId, PollManager, PollSpec, PollStage, PollState, SecretManager, TallierShare},
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -41,6 +43,7 @@ pub enum ExportedDataType {
     PollSpec,
     Application,
     Vote,
+    TallierShare,
 }
 
 /// Application routes.
@@ -48,14 +51,18 @@ pub enum ExportedDataType {
 pub enum Route {
     #[at("/")]
     Home,
+    #[at("/about")]
+    About,
+
     #[at("/polls/new")]
     NewPoll,
     #[at("/polls/:id/participants")]
     PollParticipants { id: PollId },
     #[at("/polls/:id/vote")]
     Voting { id: PollId },
-    #[at("/about")]
-    About,
+    #[at("/polls/:id/tally")]
+    Tallying { id: PollId },
+
     #[not_found]
     #[at("/404")]
     NotFound,
@@ -66,6 +73,7 @@ impl Route {
         match stage {
             PollStage::Participants { .. } => Self::PollParticipants { id },
             PollStage::Voting { .. } => Self::Voting { id },
+            PollStage::Tallying { .. } | PollStage::Finished => Self::Tallying { id },
         }
     }
 }
@@ -90,6 +98,7 @@ impl PartialEq for AppProperties {
 pub enum AppMessage {
     PollCreated(PollSpec),
     ParticipantsFinalized(PollId, Box<PollState>),
+    VotesFinalized(PollId, Box<PollState>),
 }
 
 /// Root application component.
@@ -141,6 +150,9 @@ impl Main {
         let on_vote_export = props
             .onexport
             .reform(|data| ExportedData::new(ExportedDataType::Vote, data));
+        let on_share_export = props
+            .onexport
+            .reform(|data| ExportedData::new(ExportedDataType::TallierShare, data));
 
         match route {
             Route::Home => html! { <Home /> },
@@ -164,11 +176,23 @@ impl Main {
                         })} />
                 }
             }
-            Route::Voting { id } => html! {
-                <Voting
+            Route::Voting { id } => {
+                let id = *id;
+                html! {
+                    <Voting
+                        id={id}
+                        secrets={Rc::clone(&props.secrets)}
+                        onexport={on_vote_export}
+                        ondone={link.callback(move |state| {
+                            AppMessage::VotesFinalized(id, Box::new(state))
+                        })} />
+                }
+            }
+            Route::Tallying { id } => html! {
+                <Tallying
                     id={*id}
                     secrets={Rc::clone(&props.secrets)}
-                    onexport={on_vote_export} />
+                    onexport={on_share_export} />
             },
         }
     }
@@ -195,6 +219,22 @@ impl Component for Main {
                 state.finalize_participants();
                 self.poll_manager.update_poll(&id, &state);
                 history.push(Route::Voting { id });
+            }
+            AppMessage::VotesFinalized(id, mut state) => {
+                state.finalize_votes();
+                let our_keys = ctx.props().secrets.keys_for_poll(&id);
+
+                let we_are_participant = state
+                    .participants()
+                    .iter()
+                    .any(|p| p.public_key() == our_keys.public());
+                if we_are_participant {
+                    let share = TallierShare::new(&our_keys, &id, &state);
+                    state.insert_unchecked_tallier_share(share);
+                }
+
+                self.poll_manager.update_poll(&id, &state);
+                history.push(Route::Tallying { id });
             }
         }
         true

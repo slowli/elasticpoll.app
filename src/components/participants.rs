@@ -2,20 +2,17 @@
 
 use wasm_bindgen::UnwrapThrowExt;
 use web_sys::Event;
-use yew::{classes, html, Callback, Component, Context, Html, Properties};
+use yew::{classes, html, Component, Context, Html};
 use yew_router::prelude::*;
 
-use std::rc::Rc;
-
 use super::{
-    common::{view_data_row, view_err, Card, Icon, PageMetadata, ValidatedValue},
+    common::{
+        view_data_row, view_err, Card, Icon, PageMetadata, PollStageProperties, ValidatedValue,
+    },
     Route,
 };
 use crate::{
-    poll::{
-        Participant, ParticipantApplication, PollId, PollManager, PollStage, PollState,
-        SecretManager,
-    },
+    poll::{Participant, ParticipantApplication, PollId, PollManager, PollStage, PollState},
     utils::{value_from_event, Encode},
 };
 
@@ -31,25 +28,6 @@ pub enum ParticipantsMessage {
 impl ParticipantsMessage {
     fn application_set(event: &Event) -> Self {
         Self::ApplicationSet(value_from_event(event))
-    }
-}
-
-#[derive(Debug, Clone, Properties)]
-pub struct ParticipantsProperties {
-    pub id: PollId,
-    pub secrets: Rc<SecretManager>,
-    #[prop_or_default]
-    pub onexport: Callback<String>,
-    #[prop_or_default]
-    pub ondone: Callback<PollState>,
-}
-
-impl PartialEq for ParticipantsProperties {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-            && Rc::ptr_eq(&self.secrets, &other.secrets)
-            && self.onexport == other.onexport
-            && self.ondone == other.ondone
     }
 }
 
@@ -287,7 +265,7 @@ impl Participants {
 
 impl Component for Participants {
     type Message = ParticipantsMessage;
-    type Properties = ParticipantsProperties;
+    type Properties = PollStageProperties;
 
     fn create(ctx: &Context<Self>) -> Self {
         let poll_manager = PollManager::default();
