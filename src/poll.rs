@@ -3,7 +3,8 @@
 use elastic_elgamal::{
     app::{ChoiceParams, ChoiceVerificationError, EncryptedChoice, MultiChoice, SingleChoice},
     group::Ristretto,
-    Keypair, ProofOfPossession, PublicKey, VerificationError,
+    sharing::{CandidateShare, DecryptionShare},
+    Ciphertext, Keypair, LogEqualityProof, ProofOfPossession, PublicKey, VerificationError,
 };
 use js_sys::Date;
 use merlin::Transcript;
@@ -134,6 +135,7 @@ pub struct Participant {
     pub application: ParticipantApplication,
     pub created_at: f64,
     pub vote: Option<SubmittedVote>,
+    pub tallier_share: Option<SubmittedTallierShare>,
 }
 
 impl From<ParticipantApplication> for Participant {
@@ -142,6 +144,7 @@ impl From<ParticipantApplication> for Participant {
             application,
             created_at: Date::now(),
             vote: None,
+            tallier_share: None,
         }
     }
 }
@@ -200,6 +203,15 @@ impl VoteChoice {
 enum EncryptedVoteChoice {
     SingleChoice(EncryptedChoice<Ristretto, SingleChoice>),
     MultiChoice(EncryptedChoice<Ristretto, MultiChoice>),
+}
+
+impl EncryptedVoteChoice {
+    fn choices_unchecked(&self) -> &[Ciphertext<Ristretto>] {
+        match self {
+            Self::SingleChoice(choice) => choice.choices_unchecked(),
+            Self::MultiChoice(choice) => choice.choices_unchecked(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -365,24 +377,186 @@ impl From<Vote> for SubmittedVote {
     }
 }
 
+impl SubmittedVote {
+    fn choices(&self) -> &[Ciphertext<Ristretto>] {
+        self.inner.choice.choices_unchecked()
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TallierShare {
+    shares: Vec<ShareWithProof>,
+    public_key: PublicKey<Ristretto>,
+}
+
+impl TallierShare {
+    pub fn new(keypair: &Keypair<Ristretto>, poll_id: &PollId, poll_state: &PollState) -> Self {
+        let transcript = Self::create_transcript(poll_id, poll_state);
+        let ciphertexts = poll_state.cumulative_choices();
+        let shares = ciphertexts.into_iter().map(|ciphertext| {
+            let (share, proof) =
+                DecryptionShare::new(ciphertext, keypair, &mut transcript.clone(), &mut OsRng);
+            ShareWithProof {
+                share: share.into(),
+                proof,
+            }
+        });
+
+        Self {
+            shares: shares.collect(),
+            public_key: keypair.public().clone(),
+        }
+    }
+
+    fn create_transcript(poll_id: &PollId, poll_state: &PollState) -> Transcript {
+        let mut transcript = Transcript::new(b"tallier_share");
+        transcript.append_message(b"poll_id", &poll_id.0);
+        // Commit to the shared key and number of participants.
+        transcript.append_message(b"shared_key", poll_state.finalized_shared_key().as_bytes());
+        transcript.append_u64(b"n", poll_state.participants.len() as u64);
+        transcript
+    }
+
+    fn verify(&self, poll_id: &PollId, poll: &PollState) -> Result<(), TallierShareError> {
+        // Check that all shares were submitted.
+        TallierShareError::ensure_options_count(poll.spec.options.len(), self.shares.len())?;
+        // Check that the voter is eligible.
+        if !poll
+            .participants
+            .iter()
+            .any(|p| *p.public_key() == self.public_key)
+        {
+            return Err(TallierShareError::IneligibleTallier);
+        }
+
+        let transcript = Self::create_transcript(poll_id, poll);
+        let ciphertexts = poll.cumulative_choices();
+
+        let it = self.shares.iter().enumerate().zip(ciphertexts);
+        for ((i, share_with_proof), ciphertext) in it {
+            share_with_proof
+                .share
+                .verify(
+                    ciphertext,
+                    &self.public_key,
+                    &share_with_proof.proof,
+                    &mut transcript.clone(), // transcripts for all proofs are independent
+                )
+                .map_err(|err| TallierShareError::InvalidShare { index: i, err })?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub enum TallierShareError {
+    OptionsCount {
+        expected: usize,
+        actual: usize,
+    },
+    IneligibleTallier,
+    InvalidShare {
+        index: usize,
+        err: VerificationError,
+    },
+}
+
+impl fmt::Display for TallierShareError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::OptionsCount { expected, actual } => {
+                write!(
+                    formatter,
+                    "unexpected number of options: expected {}, got {}",
+                    expected, actual
+                )
+            }
+            Self::IneligibleTallier => formatter.write_str("tallier is not eligible"),
+            Self::InvalidShare { index, err } => {
+                write!(
+                    formatter,
+                    "cannot verify share for option #{}: {}",
+                    *index + 1,
+                    err
+                )
+            }
+        }
+    }
+}
+
+impl StdError for TallierShareError {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        match self {
+            Self::InvalidShare { err, .. } => Some(err),
+            _ => None,
+        }
+    }
+}
+
+impl TallierShareError {
+    fn ensure_options_count(expected: usize, actual: usize) -> Result<(), Self> {
+        if expected == actual {
+            Ok(())
+        } else {
+            Err(Self::OptionsCount { expected, actual })
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ShareWithProof {
+    share: CandidateShare<Ristretto>,
+    proof: LogEqualityProof<Ristretto>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SubmittedTallierShare {
+    #[serde(flatten)]
+    pub inner: TallierShare,
+    /// Unix timestamp (in milliseconds).
+    pub submitted_at: f64,
+}
+
+impl From<TallierShare> for SubmittedTallierShare {
+    fn from(share: TallierShare) -> Self {
+        Self {
+            inner: share,
+            submitted_at: Date::now(),
+        }
+    }
+}
+
 // TODO: add specification
 #[derive(Debug, Clone, Copy)]
 pub enum PollStage {
     Participants { participants: usize },
     Voting { votes: usize, participants: usize },
+    Tallying { shares: usize, participants: usize },
+    Finished,
 }
 
 impl PollStage {
     pub const PARTICIPANTS_IDX: usize = 1;
     pub const VOTING_IDX: usize = 2;
-    pub const MAX_INDEX: usize = 3;
+    pub const TALLYING_IDX: usize = 3;
+    pub const FINISHED_IDX: usize = 4;
+    pub const MAX_INDEX: usize = Self::FINISHED_IDX;
 
     pub fn index(&self) -> usize {
         match self {
             Self::Participants { .. } => Self::PARTICIPANTS_IDX,
             Self::Voting { .. } => Self::VOTING_IDX,
+            Self::Tallying { .. } => Self::TALLYING_IDX,
+            Self::Finished => Self::FINISHED_IDX,
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum TallyResult {
+    InProgress,
+    Finished(Vec<u64>),
 }
 
 /// Ongoing or finished poll state.
@@ -396,6 +570,8 @@ pub struct PollState {
     /// Shared encryption key for the voting. Only present if the set of participants is final.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     shared_key: Option<PublicKey<Ristretto>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    tally_result: Option<TallyResult>,
 }
 
 impl PollState {
@@ -405,6 +581,7 @@ impl PollState {
             created_at: Date::now(),
             participants: Vec::new(),
             shared_key: None,
+            tally_result: None,
         }
     }
 
@@ -418,13 +595,24 @@ impl PollState {
                 participants: self.participants.len(),
             }
         } else {
-            PollStage::Voting {
-                votes: self
-                    .participants
-                    .iter()
-                    .filter(|p| p.vote.is_some())
-                    .count(),
-                participants: self.participants.len(),
+            match &self.tally_result {
+                None => PollStage::Voting {
+                    votes: self
+                        .participants
+                        .iter()
+                        .filter(|p| p.vote.is_some())
+                        .count(),
+                    participants: self.participants.len(),
+                },
+                Some(TallyResult::InProgress) => PollStage::Tallying {
+                    shares: self
+                        .participants
+                        .iter()
+                        .filter(|p| p.tallier_share.is_some())
+                        .count(),
+                    participants: self.participants.len(),
+                },
+                Some(TallyResult::Finished(_)) => PollStage::Finished,
             }
         }
     }
@@ -488,12 +676,64 @@ impl PollState {
     }
 
     pub fn insert_unchecked_vote(&mut self, vote: Vote) {
+        assert!(
+            self.shared_key.is_some(),
+            "cannot insert a vote before participants are finalized"
+        );
+        assert!(
+            self.tally_result.is_none(),
+            "cannot insert a vote after votes are finalized"
+        );
+
         let participant = self
             .participants
             .iter_mut()
             .find(|p| *p.public_key() == vote.public_key)
             .expect("vote does not come from an eligible voter");
         participant.vote = Some(vote.into());
+    }
+
+    pub fn finalize_votes(&mut self) {
+        self.tally_result = Some(TallyResult::InProgress);
+    }
+
+    pub fn cumulative_choices(&self) -> Vec<Ciphertext<Ristretto>> {
+        let mut ciphertexts = vec![Ciphertext::zero(); self.spec.options.len()];
+
+        let participant_ciphertexts = self
+            .participants
+            .iter()
+            .filter_map(|p| p.vote.as_ref().map(SubmittedVote::choices));
+        for vote_ciphertexts in participant_ciphertexts {
+            debug_assert_eq!(vote_ciphertexts.len(), ciphertexts.len());
+            for (dest, src) in ciphertexts.iter_mut().zip(vote_ciphertexts) {
+                *dest += *src;
+            }
+        }
+        ciphertexts
+    }
+
+    pub fn insert_tallier_share(
+        &mut self,
+        poll_id: &PollId,
+        share: TallierShare,
+    ) -> Result<(), TallierShareError> {
+        share.verify(poll_id, self)?;
+        self.insert_unchecked_tallier_share(share);
+        Ok(())
+    }
+
+    pub fn insert_unchecked_tallier_share(&mut self, share: TallierShare) {
+        assert!(
+            matches!(&self.tally_result, Some(TallyResult::InProgress)),
+            "cannot insert tallier share when tallying is not active"
+        );
+        let participant = self
+            .participants
+            .iter_mut()
+            .find(|p| *p.public_key() == share.public_key)
+            .expect("vote does not come from an eligible voter");
+        participant.tallier_share = Some(share.into());
     }
 }
 
