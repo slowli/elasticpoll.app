@@ -13,7 +13,7 @@ use crate::utils::VecHelper;
 mod managers;
 mod participant;
 
-pub use self::managers::{PollManager, SecretManager};
+pub use self::managers::{PollManager, SecretManager, SecretManagerStatus};
 pub use self::participant::{
     Participant, ParticipantApplication, SubmittedTallierShare, SubmittedVote, TallierShare,
     TallierShareError, Vote, VoteChoice, VoteError,

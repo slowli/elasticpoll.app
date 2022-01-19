@@ -1,14 +1,17 @@
 //! [`PollManager`] and [`SecretsManager`].
 
 use elastic_elgamal::{group::Ristretto, Keypair, PublicKey};
+use js_sys::{Error, JsString, Uint8Array};
 use rand_core::OsRng;
-use secret_tree::SecretTree;
-use wasm_bindgen::UnwrapThrowExt;
+use secrecy::ExposeSecret;
+use secret_tree::{SecretTree, Seed};
+use wasm_bindgen::{JsCast, UnwrapThrowExt};
+use wasm_bindgen_futures::JsFuture;
 
-use std::{cell::RefCell, collections::HashMap, str::FromStr};
+use std::{cell::RefCell, collections::HashMap, future::Future, pin::Pin, rc::Rc, str::FromStr};
 
 use super::{PollId, PollSpec, PollState};
-use crate::utils::local_storage;
+use crate::{utils::local_storage, PasswordBasedCrypto};
 
 #[derive(Debug)]
 pub struct PollManager {
@@ -100,35 +103,143 @@ impl PollManager {
     }
 }
 
-/// Manager of application secrets.
-// FIXME: store in local storage in password-encrypted form; query password to unlock
 #[derive(Debug)]
-pub struct SecretManager {
-    secret: SecretTree,
-    pk_cache: RefCell<HashMap<PollId, PublicKey<Ristretto>>>,
+enum SecretManagerState {
+    Locked,
+    Unlocked(SecretTree),
 }
 
-impl Default for SecretManager {
+impl Default for SecretManagerState {
     fn default() -> Self {
-        Self {
-            secret: SecretTree::new(&mut OsRng),
-            pk_cache: RefCell::default(),
-        }
+        Self::Locked
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum SecretManagerStatus {
+    Locked,
+    Unlocked,
+}
+
+/// Manager of application secrets.
+#[derive(Debug)]
+pub struct SecretManager {
+    storage_key: &'static str,
+    state: RefCell<SecretManagerState>,
+    pk_cache: RefCell<HashMap<PollId, PublicKey<Ristretto>>>,
+    crypto: Rc<dyn PasswordBasedCrypto>,
+}
+
 impl SecretManager {
-    pub fn keys_for_poll(&self, poll_id: &PollId) -> Keypair<Ristretto> {
-        let child = self.secret.digest(&poll_id.0);
+    pub fn new(crypto: Rc<dyn PasswordBasedCrypto>) -> Self {
+        Self {
+            storage_key: "elastic_elgamal_site::secret", // FIXME
+            state: RefCell::default(),
+            pk_cache: RefCell::default(),
+            crypto,
+        }
+    }
+
+    fn persist(&self, box_json: &str) {
+        local_storage()
+            .set_item(self.storage_key, box_json)
+            .expect_throw("cannot persist encrypted secret");
+    }
+
+    fn encrypted_secret(&self) -> Option<String> {
+        local_storage()
+            .get_item(self.storage_key)
+            .expect_throw("failed getting encrypted secret")
+    }
+
+    fn unlock_with_secret(&self, secret: SecretTree) {
+        *self.state.borrow_mut() = SecretManagerState::Unlocked(secret);
+    }
+
+    pub fn status(&self) -> Option<SecretManagerStatus> {
+        if self.encrypted_secret().is_none() {
+            None
+        } else {
+            Some(match *self.state.borrow() {
+                SecretManagerState::Locked => SecretManagerStatus::Locked,
+                SecretManagerState::Unlocked(_) => SecretManagerStatus::Unlocked,
+            })
+        }
+    }
+
+    pub fn encrypt_new_secret(
+        self: &Rc<Self>,
+        password: &str,
+    ) -> impl Future<Output = Result<(), Error>> {
+        // We use pinning to enable to pass a ref `&[u8]` of the seed to the host
+        // (i.e., not copying seed bytes to a `Box<[u8]>`. If pinning is not used,
+        // the seed is moved to the closure and will lead to `seal` encrypting garbage
+        // instead of the seed.
+        let secret = Box::pin(SecretTree::new(&mut OsRng));
+        let task = self.crypto.seal(password, secret.seed().expose_secret());
+
+        let this = Rc::clone(self);
+        async move {
+            JsFuture::from(task)
+                .await
+                .map(|box_json| {
+                    let box_json = box_json
+                        .dyn_into::<JsString>()
+                        .expect_throw("unexpected seal_fn output");
+                    this.persist(&String::from(box_json));
+                    this.unlock_with_secret(*Pin::into_inner(secret));
+                })
+                .map_err(|err| {
+                    err.dyn_into::<Error>()
+                        .unwrap_or_else(|_| Error::new("(unknown error)"))
+                })
+        }
+    }
+
+    pub fn unlock(self: &Rc<Self>, password: &str) -> impl Future<Output = Result<(), Error>> {
+        let encrypted_secret = self
+            .encrypted_secret()
+            .expect_throw("called `unlock` without stored secret");
+        let task = self.crypto.open(password, &encrypted_secret);
+
+        let this = Rc::clone(self);
+        async move {
+            JsFuture::from(task)
+                .await
+                .map(|secret_bytes| {
+                    let secret_bytes = secret_bytes
+                        .dyn_into::<Uint8Array>()
+                        .expect_throw("unexpected open_fn output");
+                    let mut seed = [0_u8; 32];
+                    secret_bytes.copy_to(&mut seed);
+                    this.unlock_with_secret(SecretTree::from_seed(Seed::new(seed)));
+                })
+                .map_err(|err| {
+                    err.dyn_into::<Error>()
+                        .unwrap_or_else(|_| Error::new("(unknown error)"))
+                })
+        }
+    }
+
+    /// Returns `None` if the manager is not unlocked.
+    pub fn keys_for_poll(&self, poll_id: &PollId) -> Option<Keypair<Ristretto>> {
+        let state = self.state.borrow();
+        let secret = match &*state {
+            SecretManagerState::Unlocked(tree) => tree,
+            SecretManagerState::Locked => return None,
+        };
+
+        let child = secret.digest(&poll_id.0);
         let keypair = Keypair::generate(&mut child.rng());
         self.pk_cache
             .borrow_mut()
             .insert(*poll_id, keypair.public().clone());
-        keypair
+        Some(keypair)
     }
 
-    pub fn public_key_for_poll(&self, poll_id: &PollId) -> PublicKey<Ristretto> {
+    /// Returns `None` if the manager is not unlocked.
+    pub fn public_key_for_poll(&self, poll_id: &PollId) -> Option<PublicKey<Ristretto>> {
         let pk = self.pk_cache.borrow().get(poll_id).cloned();
-        pk.unwrap_or_else(|| self.keys_for_poll(poll_id).into_tuple().0)
+        pk.or_else(|| self.keys_for_poll(poll_id).map(|keys| keys.into_tuple().0))
     }
 }
