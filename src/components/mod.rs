@@ -15,6 +15,7 @@ mod common;
 mod home;
 mod new_poll;
 mod participants;
+mod secrets;
 mod tallying;
 mod voting;
 
