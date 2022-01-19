@@ -1,5 +1,6 @@
 //! Tallying page.
 
+use elastic_elgamal::{group::Ristretto, PublicKey};
 use wasm_bindgen::UnwrapThrowExt;
 use web_sys::Event;
 use yew::{classes, html, Component, Context, Html};
@@ -7,12 +8,14 @@ use yew_router::prelude::*;
 
 use super::{
     common::{view_err, Card, Icon, PageMetadata, PollStageProperties, ValidatedValue},
-    Route,
+    secrets::Secrets,
+    AppProperties, ExportedData, ExportedDataType, Route,
 };
 use crate::components::common::view_data_row;
 use crate::{
     poll::{
-        Participant, PollId, PollManager, PollStage, PollState, SubmittedTallierShare, TallierShare,
+        Participant, PollId, PollManager, PollStage, PollState, SecretManagerStatus,
+        SubmittedTallierShare, TallierShare,
     },
     utils::{value_from_event, Encode},
 };
@@ -21,6 +24,7 @@ use crate::{
 pub enum TallyingMessage {
     ShareSet(String),
     ExportRequested(usize),
+    SecretUpdated,
 }
 
 impl TallyingMessage {
@@ -66,8 +70,27 @@ impl Tallying {
                 return;
             }
             self.poll_manager.update_poll(&self.poll_id, state);
+            self.is_readonly = state.results().is_some();
         }
         self.new_share = ValidatedValue::default();
+    }
+
+    fn maybe_submit_our_share(&mut self, ctx: &Context<Self>) -> Option<()> {
+        let state = self.poll_state.as_mut()?;
+        let our_keys = AppProperties::from_ctx(ctx)
+            .secrets
+            .keys_for_poll(&self.poll_id)?;
+        let our_participant = state
+            .participants()
+            .iter()
+            .find(|&p| p.public_key() == our_keys.public())?;
+
+        if our_participant.tallier_share.is_none() {
+            let share = TallierShare::new(&our_keys, &self.poll_id, state);
+            state.insert_unchecked_tallier_share(share);
+        }
+        self.poll_manager.update_poll(&self.poll_id, state);
+        Some(())
     }
 
     fn view_poll(&self, state: &PollState, ctx: &Context<Self>) -> Html {
@@ -78,12 +101,31 @@ impl Tallying {
                     allow to decrypt the cumulative votes." }</p>
 
                 <h4>{ "Shares" }</h4>
+                { Self::view_secrets_alert(ctx) }
                 { self.view_shares(state, ctx) }
             </>
         }
     }
 
+    fn view_secrets_alert(ctx: &Context<Self>) -> Html {
+        let secrets = AppProperties::from_ctx(ctx).secrets;
+        let link = ctx.link();
+        if secrets.status() == Some(SecretManagerStatus::Locked) {
+            html! {
+                <>
+                    { Secrets::view_alert(&secrets, "tallier share") }
+                    <Secrets ondone={link.callback(|()| TallyingMessage::SecretUpdated)} />
+                </>
+            }
+        } else {
+            html! {}
+        }
+    }
+
     fn view_shares(&self, state: &PollState, ctx: &Context<Self>) -> Html {
+        let our_key = AppProperties::from_ctx(ctx)
+            .secrets
+            .public_key_for_poll(&self.poll_id);
         let shares: Html = state
             .participants()
             .iter()
@@ -91,7 +133,7 @@ impl Tallying {
             .filter_map(|(idx, participant)| {
                 let share = participant.tallier_share.as_ref();
                 share.map(|share| {
-                    let share = self.view_share(idx, participant, share, ctx);
+                    let share = Self::view_share(idx, participant, share, our_key.as_ref(), ctx);
                     html! { <div class="col-lg-6">{ share }</div> }
                 })
             })
@@ -110,10 +152,10 @@ impl Tallying {
     }
 
     fn view_share(
-        &self,
         idx: usize,
         participant: &Participant,
         share: &SubmittedTallierShare,
+        our_key: Option<&PublicKey<Ristretto>>,
         ctx: &Context<Self>,
     ) -> Html {
         let title = format!("Tallier #{}", idx + 1);
@@ -121,15 +163,14 @@ impl Tallying {
             html! { title },
             html! {
                 <p class="card-text mb-0 text-truncate">
-                    <strong>{ "Tallier’s public key:" }</strong>
+                    <strong>{ "Tallier’s key:" }</strong>
                     { " " }
                     { participant.public_key().encode() }
                 </p>
             },
         );
 
-        let our_key = ctx.props().secrets.public_key_for_poll(&self.poll_id);
-        if *participant.public_key() == our_key {
+        if our_key == Some(participant.public_key()) {
             card = card.with_our_mark();
         }
 
@@ -259,9 +300,15 @@ impl Component for Tallying {
                 if let Some(share) = self.share(idx) {
                     let share = serde_json::to_string_pretty(share)
                         .expect_throw("failed serializing `TallierShare`");
-                    ctx.props().onexport.emit(share);
+                    AppProperties::from_ctx(ctx).onexport.emit(ExportedData {
+                        ty: ExportedDataType::TallierShare,
+                        data: share,
+                    });
                 }
                 return false;
+            }
+            TallyingMessage::SecretUpdated => {
+                return self.maybe_submit_our_share(ctx).is_some();
             }
         }
         true

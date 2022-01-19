@@ -4,7 +4,7 @@ use js_sys::Error;
 use wasm_bindgen::UnwrapThrowExt;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{FocusEvent, HtmlInputElement};
-use yew::{classes, html, Component, Context, Html, NodeRef};
+use yew::{classes, html, Callback, Component, Context, Html, NodeRef, Properties};
 
 use super::{common::view_err, AppProperties};
 use crate::poll::{SecretManager, SecretManagerStatus};
@@ -15,6 +15,12 @@ pub enum SecretsMessage {
     Unlocked,
     ErrorUnlocking(Error),
     Submitted { new_secret: bool },
+}
+
+#[derive(Debug, Clone, PartialEq, Properties)]
+pub struct SecretsProperties {
+    #[prop_or_default]
+    pub ondone: Callback<()>,
 }
 
 #[derive(Debug)]
@@ -111,10 +117,10 @@ impl Secrets {
 
 impl Component for Secrets {
     type Message = SecretsMessage;
-    type Properties = ();
+    type Properties = SecretsProperties;
 
     fn create(ctx: &Context<Self>) -> Self {
-        let secrets = &AppProperties::from_ctx(ctx).secrets;
+        let secrets = AppProperties::from_ctx(ctx).secrets;
         let new_secret = !matches!(secrets.status(), Some(SecretManagerStatus::Locked));
         Self {
             input_ref: NodeRef::default(),
@@ -155,6 +161,7 @@ impl Component for Secrets {
                 self.in_progress = false;
                 self.err = None;
                 global_props.modals.hide_modal("unlock-secrets-modal");
+                ctx.props().ondone.emit(());
             }
             SecretsMessage::ErrorUnlocking(err) => {
                 self.in_progress = false;

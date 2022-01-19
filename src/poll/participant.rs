@@ -188,11 +188,7 @@ impl Vote {
 
     pub(super) fn verify(&self, poll_id: &PollId, poll: &PollState) -> Result<(), VoteError> {
         // Check that the voter is eligible.
-        if !poll
-            .participants
-            .iter()
-            .any(|p| *p.public_key() == self.public_key)
-        {
+        if !poll.has_participant(&self.public_key) {
             return Err(VoteError::IneligibleVoter);
         }
 
@@ -347,11 +343,7 @@ impl TallierShare {
         // Check that all shares were submitted.
         TallierShareError::ensure_options_count(poll.spec.options.len(), self.shares.len())?;
         // Check that the voter is eligible.
-        if !poll
-            .participants
-            .iter()
-            .any(|p| *p.public_key() == self.public_key)
-        {
+        if !poll.has_participant(&self.public_key) {
             return Err(TallierShareError::IneligibleTallier);
         }
 

@@ -193,6 +193,12 @@ impl PollState {
         &self.participants
     }
 
+    pub fn has_participant(&self, public_key: &PublicKey<Ristretto>) -> bool {
+        self.participants
+            .iter()
+            .any(|p| p.public_key() == public_key)
+    }
+
     pub fn insert_participant(&mut self, application: ParticipantApplication) {
         assert!(
             self.shared_key.is_none(),

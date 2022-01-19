@@ -1,5 +1,6 @@
 //! Voting page.
 
+use elastic_elgamal::{group::Ristretto, PublicKey};
 use wasm_bindgen::UnwrapThrowExt;
 use web_sys::{Event, HtmlInputElement};
 use yew::{classes, html, Component, Context, Html};
@@ -7,8 +8,10 @@ use yew_router::prelude::*;
 
 use super::{
     common::{view_err, Card, Icon, PageMetadata, PollStageProperties, ValidatedValue},
-    Route,
+    secrets::Secrets,
+    AppProperties, ExportedData, ExportedDataType, Route,
 };
+use crate::poll::SecretManagerStatus;
 use crate::{
     poll::{
         Participant, PollId, PollManager, PollStage, PollState, SubmittedVote, Vote, VoteChoice,
@@ -22,6 +25,7 @@ pub enum VotingMessage {
     VoteSet(String),
     OurVoteAdded,
     ExportRequested(usize),
+    SecretUpdated,
     Done,
 }
 
@@ -49,6 +53,23 @@ pub struct Voting {
 }
 
 impl Voting {
+    fn default_choice(
+        poll_id: &PollId,
+        poll_state: Option<&PollState>,
+        ctx: &Context<Self>,
+    ) -> Option<VoteChoice> {
+        let our_key = AppProperties::from_ctx(ctx)
+            .secrets
+            .public_key_for_poll(poll_id);
+        poll_state.and_then(|state| {
+            if state.has_participant(&our_key?) {
+                Some(VoteChoice::default(state.spec()))
+            } else {
+                None
+            }
+        })
+    }
+
     fn vote(&self, idx: usize) -> Option<&Vote> {
         let participants = self.poll_state.as_ref()?.participants();
         Some(&participants.get(idx)?.vote.as_ref()?.inner)
@@ -82,7 +103,10 @@ impl Voting {
     fn insert_our_vote(&mut self, ctx: &Context<Self>) {
         if let Some(state) = &mut self.poll_state {
             if let Some(choice) = &self.our_choice {
-                let our_keypair = ctx.props().secrets.keys_for_poll(&self.poll_id);
+                let our_keypair = AppProperties::from_ctx(ctx)
+                    .secrets
+                    .keys_for_poll(&self.poll_id)
+                    .expect_throw("creating vote with locked secret manager");
                 let vote = Vote::new(&our_keypair, &self.poll_id, state, choice);
                 state.insert_unchecked_vote(vote);
                 self.poll_manager.update_poll(&self.poll_id, state);
@@ -98,12 +122,31 @@ impl Voting {
                 <p>{ "Each participant can submit a vote an unlimited number of times." }</p>
 
                 <h4>{ "Votes" }</h4>
+                { Self::view_secrets_alert(ctx) }
                 { self.view_votes(state, ctx) }
             </>
         }
     }
 
+    fn view_secrets_alert(ctx: &Context<Self>) -> Html {
+        let secrets = AppProperties::from_ctx(ctx).secrets;
+        let link = ctx.link();
+        if secrets.status() == Some(SecretManagerStatus::Locked) {
+            html! {
+                <>
+                    { Secrets::view_alert(&secrets, "vote") }
+                    <Secrets ondone={link.callback(|()| VotingMessage::SecretUpdated)} />
+                </>
+            }
+        } else {
+            html! {}
+        }
+    }
+
     fn view_votes(&self, state: &PollState, ctx: &Context<Self>) -> Html {
+        let our_key = AppProperties::from_ctx(ctx)
+            .secrets
+            .public_key_for_poll(&self.poll_id);
         let votes: Html = state
             .participants()
             .iter()
@@ -111,7 +154,7 @@ impl Voting {
             .filter_map(|(idx, participant)| {
                 let vote = participant.vote.as_ref();
                 vote.map(|vote| {
-                    let vote = self.view_vote(idx, participant, vote, ctx);
+                    let vote = Self::view_vote(idx, participant, vote, our_key.as_ref(), ctx);
                     html! { <div class="col-lg-6">{ vote }</div> }
                 })
             })
@@ -129,10 +172,10 @@ impl Voting {
     }
 
     fn view_vote(
-        &self,
         idx: usize,
         participant: &Participant,
         vote: &SubmittedVote,
+        our_key: Option<&PublicKey<Ristretto>>,
         ctx: &Context<Self>,
     ) -> Html {
         let title = format!("Voter #{}", idx + 1);
@@ -146,7 +189,7 @@ impl Voting {
                         { &vote.hash }
                     </p>
                     <p class="card-text mb-0 text-truncate">
-                        <strong>{ "Voter’s public key:" }</strong>
+                        <strong>{ "Voter’s key:" }</strong>
                         { " " }
                         { participant.public_key().encode() }
                     </p>
@@ -154,8 +197,7 @@ impl Voting {
             },
         );
 
-        let our_key = ctx.props().secrets.public_key_for_poll(&self.poll_id);
-        if *participant.public_key() == our_key {
+        if our_key == Some(participant.public_key()) {
             card = card.with_our_mark();
         }
 
@@ -245,30 +287,17 @@ impl Component for Voting {
             !matches!(state.stage(), PollStage::Voting { .. })
         });
 
-        let our_key = ctx.props().secrets.public_key_for_poll(&poll_id);
-        let our_choice = poll_state.as_ref().and_then(|state| {
-            let we_are_participant = state
-                .participants()
-                .iter()
-                .any(|p| *p.public_key() == our_key);
-            if we_are_participant {
-                Some(VoteChoice::default(state.spec()))
-            } else {
-                None
-            }
-        });
-
         Self {
             metadata: PageMetadata {
                 title: "Voting & vote management".to_owned(),
                 description: "Allows creating and submitting votes for the poll".to_owned(),
                 is_root: false,
             },
+            our_choice: Self::default_choice(&poll_id, poll_state.as_ref(), ctx),
             poll_manager,
             poll_id,
             poll_state,
             is_readonly,
-            our_choice,
             new_vote: ValidatedValue::default(),
         }
     }
@@ -290,9 +319,19 @@ impl Component for Voting {
                 if let Some(vote) = self.vote(idx) {
                     let vote = serde_json::to_string_pretty(vote)
                         .expect_throw("failed serializing `Vote`");
-                    ctx.props().onexport.emit(vote);
+                    AppProperties::from_ctx(ctx).onexport.emit(ExportedData {
+                        ty: ExportedDataType::Vote,
+                        data: vote,
+                    });
                 }
                 return false;
+            }
+
+            VotingMessage::SecretUpdated => {
+                if self.our_choice.is_none() {
+                    self.our_choice =
+                        Self::default_choice(&self.poll_id, self.poll_state.as_ref(), ctx);
+                }
             }
             VotingMessage::Done => {
                 let state = self.poll_state.take().expect_throw("no poll state");

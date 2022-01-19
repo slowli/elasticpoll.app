@@ -9,6 +9,8 @@
     clippy::needless_pass_by_value // FIXME: move to appropriate place
 )]
 
+// TODO: improve crate structure, aliases for keys
+
 use js_sys::Promise;
 use wasm_bindgen::{prelude::*, UnwrapThrowExt};
 use yew::Callback;

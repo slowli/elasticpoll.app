@@ -9,10 +9,14 @@ use super::{
     common::{
         view_data_row, view_err, Card, Icon, PageMetadata, PollStageProperties, ValidatedValue,
     },
-    Route,
+    secrets::Secrets,
+    AppProperties, ExportedData, ExportedDataType, Route,
 };
 use crate::{
-    poll::{Participant, ParticipantApplication, PollId, PollManager, PollStage, PollState},
+    poll::{
+        Participant, ParticipantApplication, PollId, PollManager, PollStage, PollState,
+        SecretManagerStatus,
+    },
     utils::{value_from_event, Encode},
 };
 
@@ -22,6 +26,7 @@ pub enum ParticipantsMessage {
     ParticipantRemoved(usize),
     UsAdded,
     ExportRequested(usize),
+    SecretUpdated,
     Done,
 }
 
@@ -44,11 +49,12 @@ pub struct Participants {
 
 impl Participants {
     fn we_are_participant(&self, state: &PollState, ctx: &Context<Self>) -> bool {
-        let pk = ctx.props().secrets.public_key_for_poll(&self.poll_id);
-        state
-            .participants()
-            .iter()
-            .any(|participant| *participant.public_key() == pk)
+        let secrets = AppProperties::from_ctx(ctx).secrets;
+        let pk = match secrets.public_key_for_poll(&self.poll_id) {
+            Some(pk) => pk,
+            None => return false,
+        };
+        state.has_participant(&pk)
     }
 
     fn add_participant(&mut self, participant: ParticipantApplication) {
@@ -90,7 +96,10 @@ impl Participants {
     }
 
     fn create_our_participant(&self, ctx: &Context<Self>) -> ParticipantApplication {
-        let our_keypair = ctx.props().secrets.keys_for_poll(&self.poll_id);
+        let our_keypair = AppProperties::from_ctx(ctx)
+            .secrets
+            .keys_for_poll(&self.poll_id)
+            .expect_throw("creating participant application with locked secret manager");
         ParticipantApplication::new(&our_keypair, &self.poll_id)
     }
 
@@ -147,8 +156,10 @@ impl Participants {
             },
         );
 
-        let our_key = ctx.props().secrets.public_key_for_poll(&self.poll_id);
-        if *participant.public_key() == our_key {
+        let our_key = AppProperties::from_ctx(ctx)
+            .secrets
+            .public_key_for_poll(&self.poll_id);
+        if our_key.as_ref() == Some(participant.public_key()) {
             card = card.with_our_mark();
         }
 
@@ -184,20 +195,31 @@ impl Participants {
     }
 
     fn view_add_us_form(&self, state: &PollState, ctx: &Context<Self>) -> Html {
-        if self.is_readonly || self.we_are_participant(state, ctx) {
-            html! {}
+        let secrets = AppProperties::from_ctx(ctx).secrets;
+        let link = ctx.link();
+
+        if secrets.status() == Some(SecretManagerStatus::Unlocked) {
+            if self.is_readonly || self.we_are_participant(state, ctx) {
+                html! {}
+            } else {
+                html! {
+                    <div class="alert alert-warning py-2" role="alert">
+                        { "You are not a vote participant. " }
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-primary align-baseline ms-2"
+                            onclick={link.callback(|_| ParticipantsMessage::UsAdded)}>
+                            { "Add yourself" }
+                        </button>
+                    </div>
+                }
+            }
         } else {
-            let link = ctx.link();
             html! {
-                <div class="alert alert-warning py-2" role="alert">
-                    { "You are not a vote participant. " }
-                    <button
-                        type="button"
-                        class="btn btn-sm btn-primary align-baseline ms-2"
-                        onclick={link.callback(|_| ParticipantsMessage::UsAdded)}>
-                        { "Add yourself" }
-                    </button>
-                </div>
+                <>
+                    { Secrets::view_alert(&secrets, "participant application") }
+                    <Secrets ondone={link.callback(|()| ParticipantsMessage::SecretUpdated)} />
+                </>
             }
         }
     }
@@ -308,11 +330,17 @@ impl Component for Participants {
                     let app = &state.participants()[idx].application;
                     let app = serde_json::to_string_pretty(app)
                         .expect_throw("failed serializing `ParticipantApplication`");
-                    ctx.props().onexport.emit(app);
+                    AppProperties::from_ctx(ctx).onexport.emit(ExportedData {
+                        ty: ExportedDataType::Application,
+                        data: app,
+                    });
                 }
                 return false;
             }
 
+            ParticipantsMessage::SecretUpdated => {
+                // Do nothing specific, just re-render the component.
+            }
             ParticipantsMessage::Done => {
                 let state = self.poll_state.take().expect_throw("no poll state");
                 ctx.props().ondone.emit(state);

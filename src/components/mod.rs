@@ -213,11 +213,7 @@ impl Component for Main {
                 state.finalize_votes();
                 let our_keys = ctx.props().secrets.keys_for_poll(&id);
                 if let Some(our_keys) = our_keys {
-                    let we_are_participant = state
-                        .participants()
-                        .iter()
-                        .any(|p| p.public_key() == our_keys.public());
-                    if we_are_participant {
+                    if state.has_participant(our_keys.public()) {
                         let share = TallierShare::new(&our_keys, &id, &state);
                         state.insert_unchecked_tallier_share(share);
                     }
