@@ -167,6 +167,29 @@ impl SecretManager {
         }
     }
 
+    /// Returns `true` if the load was successful and `false` otherwise.
+    pub fn try_load_cached(self: &Rc<Self>) -> impl Future<Output = bool> {
+        let task = self.crypto.cached();
+        let this = Rc::clone(self);
+        async move {
+            if let Ok(maybe_secret_bytes) = JsFuture::from(task).await {
+                if maybe_secret_bytes.is_falsy() {
+                    return false; // no cached value
+                }
+                let secret_bytes = maybe_secret_bytes
+                    .dyn_into::<Uint8Array>()
+                    .expect_throw("unexpected cached output");
+                let mut seed = [0_u8; 32];
+                secret_bytes.copy_to(&mut seed);
+                this.unlock_with_secret(SecretTree::from_seed(Seed::new(seed)));
+                true
+            } else {
+                // TODO: log errors?
+                false
+            }
+        }
+    }
+
     pub fn encrypt_new_secret(
         self: &Rc<Self>,
         password: &str,

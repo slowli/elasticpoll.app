@@ -5,6 +5,7 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const WasmPackPlugin = require('@wasm-tool/wasm-pack-plugin');
 const AutoprefixerPlugin = require('autoprefixer');
 const PrerenderSPAPlugin = require('prerender-spa-plugin');
+const { InjectManifest } = require('workbox-webpack-plugin');
 
 const Renderer = PrerenderSPAPlugin.PuppeteerRenderer;
 const distPath = path.resolve(__dirname, 'dist');
@@ -86,6 +87,15 @@ const config = {
 };
 
 module.exports = (env, argv) => {
+  const serviceWorkerExcludes = (argv.mode === 'development')
+    ? [/.*/] // exclude precaching for dev builds (leads to infinite reloading loops)
+    : [];
+  config.plugins.push(new InjectManifest({
+    swSrc: './webpack/service-worker.js',
+    swDest: 'service-worker.js',
+    exclude: serviceWorkerExcludes,
+  }));
+
   if (argv.mode === 'production') {
     config.plugins.push(
       new MkdirpProviderPlugin(),

@@ -30,9 +30,20 @@ use self::{
 
 /// Encapsulates host-side password-based encryption operations.
 pub trait PasswordBasedCrypto {
-    /// The promise must return a string.
+    /// Seals `secret_bytes` with `password` encryption.
+    ///
+    /// The promise must return a string (a password-encrypted box).
     fn seal(&self, password: &str, secret_bytes: &[u8]) -> Promise;
-    /// The promise must return a [`Uint8Array`].
+
+    /// Returns the cached value of the secret, or `null` if it is not cached yet.
+    ///
+    /// The promise must return a [`Uint8Array`] or `null`.
+    fn cached(&self) -> Promise;
+
+    /// Opens a previously sealed box with the specified `password`.
+    ///
+    /// The promise must return a [`Uint8Array`], or throw an error if decryption
+    /// is not successful.
     fn open(&self, password: &str, encrypted: &str) -> Promise;
 }
 
@@ -63,6 +74,9 @@ extern "C" {
     #[wasm_bindgen(structural, method)]
     fn onexport(this: &JsAppProperties, data: JsValue);
 
+    #[wasm_bindgen(structural, method, js_name = getCachedBox)]
+    fn cached_box(this: &JsAppProperties) -> Promise;
+
     #[wasm_bindgen(structural, method, js_name = openBox)]
     fn open_box(this: &JsAppProperties, password: &str, encrypted: &str) -> Promise;
 
@@ -73,6 +87,10 @@ extern "C" {
 impl PasswordBasedCrypto for JsAppProperties {
     fn seal(&self, password: &str, secret_bytes: &[u8]) -> Promise {
         self.seal_box(password, secret_bytes)
+    }
+
+    fn cached(&self) -> Promise {
+        self.cached_box()
     }
 
     fn open(&self, password: &str, encrypted: &str) -> Promise {

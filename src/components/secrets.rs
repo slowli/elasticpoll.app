@@ -121,7 +121,18 @@ impl Component for Secrets {
 
     fn create(ctx: &Context<Self>) -> Self {
         let secrets = AppProperties::from_ctx(ctx).secrets;
-        let new_secret = !matches!(secrets.status(), Some(SecretManagerStatus::Locked));
+        let secrets_status = secrets.status();
+        let new_secret = !matches!(secrets_status, Some(SecretManagerStatus::Locked));
+
+        if !new_secret {
+            let link = ctx.link().clone();
+            spawn_local(async move {
+                if secrets.try_load_cached().await {
+                    link.send_message(SecretsMessage::Unlocked);
+                }
+            });
+        }
+
         Self {
             input_ref: NodeRef::default(),
             new_secret,
