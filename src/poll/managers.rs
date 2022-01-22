@@ -10,7 +10,7 @@ use wasm_bindgen_futures::JsFuture;
 use std::{cell::RefCell, collections::HashMap, future::Future, pin::Pin, rc::Rc, str::FromStr};
 
 use super::{Keypair, PollId, PollSpec, PollState, PublicKey};
-use crate::{utils::local_storage, PasswordBasedCrypto};
+use crate::{js::PasswordBasedCrypto, utils::local_storage};
 
 #[derive(Debug)]
 pub struct PollManager {

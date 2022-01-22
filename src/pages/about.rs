@@ -2,7 +2,7 @@
 
 use yew::{function_component, html};
 
-use super::common::PageMetadata;
+use super::PageMetadata;
 
 // TODO: add build details
 #[function_component(About)]

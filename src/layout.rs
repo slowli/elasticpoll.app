@@ -1,56 +1,265 @@
-//! Page layout.
+//! Layout utils.
 
-use yew::{html, Html};
-use yew_router::prelude::*;
+use js_sys::Date;
+use wasm_bindgen::UnwrapThrowExt;
+use web_sys::Event;
+use yew::{classes, html, Callback, Html, MouseEvent};
 
-use crate::components::Route;
+use crate::{
+    js::{ExportedData, ExportedDataType},
+    poll::{PollSpec, PollType, VoteChoice},
+};
 
-pub fn header() -> Html {
+fn view_local_timestamp(timestamp: f64) -> Html {
+    let date = Date::new(&timestamp.into());
     html! {
-        <header class="body-header">
-            <div class="container">
-                <h1>
-                    <Link<Route> to={ Route::Home } classes="d-block">{ "Voting" }</Link<Route>>
-                </h1>
-            </div>
-        </header>
+        <span title="This is a local timestamp; it is not synced among participants">
+            { date.to_utc_string() }
+        </span>
     }
 }
 
-pub fn footer() -> Html {
+pub fn view_data_row(label: Html, value: Html) -> Html {
     html! {
-        <footer class="page-footer small">
-            <div class="row">
-                <div class="col-md-9">
-                    <p class="mb-2">
-                        { "© 2022 Alex Ostrovski. Licensed under " }
-                        <a rel="license" href="https://www.apache.org/licenses/LICENSE-2.0">
-                            { "Apache 2.0" }
-                        </a>
-                    </p>
-                    <p>
-                        { "This site is open-source! " }
-                        <a href="https://github.com/slowli/elastic-elgamal-site">
-                            { "Contribute on GitHub" }
-                        </a>
-                    </p>
+        <div class="row mb-1">
+            <div class="col-md-4 col-lg-3">{ label }</div>
+            <div class="col-md-8 col-lg-9">{ value }</div>
+        </div>
+    }
+}
+
+pub fn view_err(message: &str) -> Html {
+    html! {
+        <p class="invalid-feedback mb-1">{ message }</p>
+    }
+}
+
+#[derive(Debug)]
+pub struct Card {
+    our_mark: bool,
+    dotted_border: bool,
+    title: Html,
+    timestamp: Option<f64>,
+    body: Html,
+    buttons: Vec<Html>,
+}
+
+impl Card {
+    pub fn new(title: Html, body: Html) -> Self {
+        Self {
+            our_mark: false,
+            dotted_border: false,
+            title,
+            timestamp: None,
+            body,
+            buttons: vec![],
+        }
+    }
+
+    pub fn with_our_mark(mut self) -> Self {
+        self.our_mark = true;
+        self
+    }
+
+    pub fn with_dotted_border(mut self) -> Self {
+        self.dotted_border = true;
+        self
+    }
+
+    pub fn with_timestamp(mut self, timestamp: f64) -> Self {
+        self.timestamp = Some(timestamp);
+        self
+    }
+
+    pub fn with_button(mut self, button: Html) -> Self {
+        self.buttons.push(button);
+        self
+    }
+
+    pub fn view(self) -> Html {
+        let mut card_classes = classes!["card", "h-100"];
+        if self.dotted_border {
+            card_classes.push("border-2");
+            card_classes.push("border-dotted");
+        }
+        let our_mark = if self.our_mark {
+            html! { <span class="badge bg-primary position-absolute ms-2">{ "You" }</span> }
+        } else {
+            html! {}
+        };
+
+        html! {
+            <div class={card_classes}>
+                <div class="card-body">
+                    <h5 class="card-title text-truncate">{ self.title }{ our_mark }</h5>
+                    { if let Some(timestamp) = self.timestamp {
+                        html! {
+                            <p class="card-subtitle mb-2 small text-muted">
+                                { "Created on " }{ view_local_timestamp(timestamp) }
+                            </p>
+                        }
+                    } else {
+                        html!{}
+                    }}
+                    { self.body }
                 </div>
-                <div class="col-md-3">
-                    <h5>{ "Useful links" }</h5>
-                    <ul class="list-unstyled">
-                        <li class="mb-1" title="About this website">
-                            <Link<Route> to={ Route::About }>{ "About" }</Link<Route>>
-                        </li>
-                        <li>
-                            <a href="https://crates.io/crates/elastic-elgamal"
-                                title="Rust library powering this website"
-                                target="_blank">
-                                { "elastic-elgamal library" }
-                            </a>
-                        </li>
-                    </ul>
+                { if self.buttons.is_empty() {
+                    html!{}
+                } else {
+                    html! { <div class="card-footer">{ for self.buttons }</div> }
+                }}
+            </div>
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Icon {
+    Remove,
+    Up,
+    Down,
+    Plus,
+    Edit,
+    Import,
+    Export,
+    Reset,
+    Check,
+}
+
+impl Icon {
+    fn icon_class(self) -> &'static str {
+        match self {
+            Self::Remove => "bi-x-lg",
+            Self::Up => "bi-arrow-up",
+            Self::Down => "bi-arrow-down",
+            Self::Plus => "bi-plus-lg",
+            Self::Edit => "bi-pencil",
+            Self::Import => "bi-code-slash",
+            Self::Export => "bi-clipboard",
+            Self::Reset => "bi-backspace",
+            Self::Check => "bi-check-lg",
+        }
+    }
+
+    pub fn view(self) -> Html {
+        html! { <i class={classes!("bi", self.icon_class())}></i> }
+    }
+}
+
+type OptionChangeCallback = Callback<(usize, Event)>;
+
+impl PollSpec {
+    pub fn view_summary_card(&self, onexport: Callback<ExportedData>) -> Html {
+        let exported_data = ExportedData {
+            ty: ExportedDataType::PollSpec,
+            data: serde_json::to_string_pretty(self).expect_throw("cannot serialize `PollSpec`"),
+        };
+        let onexport = onexport.reform(move |evt: MouseEvent| {
+            evt.stop_propagation();
+            evt.prevent_default();
+            exported_data.clone()
+        });
+
+        html! {
+            <div class="accordion mb-3" id="accordion-poll-summary">
+                <div class="accordion-item">
+                    <h4 class="accordion-header" id="accordion-header-poll-summary">
+                        <button
+                            type="button"
+                            class="accordion-button collapsed"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#accordion-body-poll-summary"
+                            aria-expanded="false"
+                            aria-controls="accordion-body-poll-summary">
+                            { "Poll parameters" }
+                        </button>
+                    </h4>
+                    <div id="accordion-body-poll-summary"
+                        class="accordion-collapse collapse"
+                        aria-labelledby="accordion-header-poll-summary"
+                        data-bs-parent="#accordion-poll-summary">
+
+                        <div class="accordion-body">
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-secondary ms-3 mb-2 float-end"
+                                title="Copy poll parameters to clipboard"
+                                onclick={onexport}>
+                                { Icon::Export.view() }{ " Export" }
+                            </button>
+                            { self.view_summary() }
+                        </div>
+                    </div>
                 </div>
             </div>
-        </footer>
+        }
+    }
+
+    fn view_summary(&self) -> Html {
+        html! {
+            <>
+                <h5>{ &self.title }</h5>
+                { self.view(None, None) }
+            </>
+        }
+    }
+
+    pub fn view_as_form(&self, choice: &VoteChoice, onchange: OptionChangeCallback) -> Html {
+        self.view(Some(choice), Some(onchange))
+    }
+
+    fn view(&self, choice: Option<&VoteChoice>, onchange: Option<OptionChangeCallback>) -> Html {
+        let ty = self.poll_type;
+        let options = self
+            .options
+            .iter()
+            .enumerate()
+            .map(|(idx, option)| {
+                let is_selected = choice.map(|choice| choice.is_selected(idx));
+                Self::view_option(idx, option, ty, is_selected, onchange.clone())
+            })
+            .collect::<Html>();
+        html! {
+            <>
+                {if self.description.trim().is_empty() {
+                    html! { }
+                } else {
+                    html! { <p class="mb-2">{ &self.description }</p> }
+                }}
+                <div>{ options }</div>
+            </>
+        }
+    }
+
+    fn view_option(
+        idx: usize,
+        option: &str,
+        ty: PollType,
+        is_selected: Option<bool>,
+        onchange: Option<OptionChangeCallback>,
+    ) -> Html {
+        let control_id = format!("poll-option{}", idx);
+        let (control_type, control_name) = match ty {
+            PollType::SingleChoice => ("radio", "poll-options".to_owned()),
+            PollType::MultiChoice => ("checkbox", control_id.clone()),
+        };
+        let is_disabled = is_selected.is_none();
+        let is_checked = is_selected.unwrap_or(false);
+        let onchange = onchange.map(|callback| callback.reform(move |evt| (idx, evt)));
+
+        html! {
+            <div class="form-check">
+                <input
+                    class="form-check-input"
+                    type={control_type}
+                    name={control_name}
+                    id={control_id.clone()}
+                    value={idx.to_string()}
+                    checked={is_checked}
+                    disabled={is_disabled}
+                    onchange={onchange} />
+                <label class="form-check-label" for={control_id}>{ option }</label>
+            </div>
+        }
     }
 }

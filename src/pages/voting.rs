@@ -5,17 +5,16 @@ use web_sys::{Event, HtmlInputElement};
 use yew::{classes, html, Component, Context, Html};
 use yew_router::prelude::*;
 
-use super::{
-    common::{view_err, Card, Icon, PageMetadata, PollStageProperties, ValidatedValue},
-    secrets::Secrets,
-    AppProperties, ExportedData, ExportedDataType, Route,
-};
 use crate::{
+    components::Secrets,
+    js::{ExportedData, ExportedDataType},
+    layout::{view_err, Card, Icon},
+    pages::{AppProperties, PageMetadata, PollStageProperties, Route},
     poll::{
         Participant, PollId, PollManager, PollStage, PollState, PublicKey, SecretManagerStatus,
         SubmittedVote, Vote, VoteChoice,
     },
-    utils::{get_event_target, value_from_event, Encode},
+    utils::{get_event_target, value_from_event, Encode, ValidatedValue},
 };
 
 #[derive(Debug)]

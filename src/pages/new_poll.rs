@@ -5,13 +5,12 @@ use wasm_bindgen::UnwrapThrowExt;
 use web_sys::Event;
 use yew::{classes, html, Callback, Component, Context, Html, Properties};
 
-use super::{
-    common::{view_data_row, view_err, Icon, PageMetadata, ValidatedValue},
-    AppProperties, ExportedData, ExportedDataType,
-};
 use crate::{
+    js::{ExportedData, ExportedDataType},
+    layout::{view_data_row, view_err, Icon},
+    pages::{AppProperties, PageMetadata},
     poll::{PollSpec, PollType, MAX_OPTIONS},
-    utils::{value_from_event, value_from_input_event},
+    utils::{value_from_event, value_from_input_event, ValidatedValue},
 };
 
 #[derive(Debug)]

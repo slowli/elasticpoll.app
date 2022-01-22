@@ -6,8 +6,11 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::{FocusEvent, HtmlInputElement};
 use yew::{classes, html, Callback, Component, Context, Html, NodeRef, Properties};
 
-use super::{common::view_err, AppProperties};
-use crate::poll::{SecretManager, SecretManagerStatus};
+use crate::{
+    layout::view_err,
+    pages::AppProperties,
+    poll::{SecretManager, SecretManagerStatus},
+};
 
 #[derive(Debug)]
 pub enum SecretsMessage {

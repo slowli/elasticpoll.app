@@ -3,11 +3,11 @@
 use yew::{classes, html, Component, Context, Html};
 use yew_router::prelude::*;
 
-use super::{
-    common::{Card, Icon, PageMetadata},
-    Route,
+use crate::{
+    layout::{Card, Icon},
+    pages::{PageMetadata, Route},
+    poll::{PollId, PollManager, PollStage, PollState},
 };
-use crate::poll::{PollId, PollManager, PollStage, PollState};
 
 #[derive(Debug)]
 pub enum HomeMessage {

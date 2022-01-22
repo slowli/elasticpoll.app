@@ -104,3 +104,28 @@ impl Encode for PublicKey {
         base64::encode_config(self.as_bytes(), base64::URL_SAFE_NO_PAD)
     }
 }
+
+/// Value together with validation errors.
+#[derive(Debug, Default)]
+pub(crate) struct ValidatedValue<T = String> {
+    pub value: T,
+    pub error_message: Option<String>,
+}
+
+impl<T> ValidatedValue<T> {
+    pub fn unvalidated(value: T) -> Self {
+        Self {
+            value,
+            error_message: None,
+        }
+    }
+}
+
+impl ValidatedValue {
+    pub fn new(value: String, check: impl FnOnce(&str) -> Option<String>) -> Self {
+        Self {
+            error_message: check(&value),
+            value,
+        }
+    }
+}
