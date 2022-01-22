@@ -2,9 +2,8 @@
 
 use elastic_elgamal::{
     app::{ChoiceParams, ChoiceVerificationError, EncryptedChoice, MultiChoice, SingleChoice},
-    group::Ristretto,
     sharing::{CandidateShare, DecryptionShare},
-    Ciphertext, Keypair, LogEqualityProof, ProofOfPossession, PublicKey, VerificationError,
+    Ciphertext, LogEqualityProof, ProofOfPossession, VerificationError,
 };
 use js_sys::Date;
 use merlin::Transcript;
@@ -15,16 +14,16 @@ use wasm_bindgen::UnwrapThrowExt;
 
 use std::{error::Error as StdError, fmt, iter, slice};
 
-use super::{PollId, PollSpec, PollState, PollType};
+use super::{Group, Keypair, PollId, PollSpec, PollState, PollType, PublicKey};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ParticipantApplication {
-    pub public_key: PublicKey<Ristretto>,
-    pub participation_consent: ProofOfPossession<Ristretto>,
+    pub public_key: PublicKey,
+    pub participation_consent: ProofOfPossession<Group>,
 }
 
 impl ParticipantApplication {
-    pub fn new(keypair: &Keypair<Ristretto>, poll_id: &PollId) -> Self {
+    pub fn new(keypair: &Keypair, poll_id: &PollId) -> Self {
         let mut transcript = Transcript::new(b"participation_consent");
         transcript.append_message(b"poll_id", &poll_id.0);
         let participation_consent =
@@ -66,7 +65,7 @@ impl From<ParticipantApplication> for Participant {
 }
 
 impl Participant {
-    pub fn public_key(&self) -> &PublicKey<Ristretto> {
+    pub fn public_key(&self) -> &PublicKey {
         &self.application.public_key
     }
 }
@@ -117,12 +116,12 @@ impl VoteChoice {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum EncryptedVoteChoice {
-    SingleChoice(EncryptedChoice<Ristretto, SingleChoice>),
-    MultiChoice(EncryptedChoice<Ristretto, MultiChoice>),
+    SingleChoice(EncryptedChoice<Group, SingleChoice>),
+    MultiChoice(EncryptedChoice<Group, MultiChoice>),
 }
 
 impl EncryptedVoteChoice {
-    fn choices_unchecked(&self) -> &[Ciphertext<Ristretto>] {
+    fn choices_unchecked(&self) -> &[Ciphertext<Group>] {
         match self {
             Self::SingleChoice(choice) => choice.choices_unchecked(),
             Self::MultiChoice(choice) => choice.choices_unchecked(),
@@ -133,17 +132,12 @@ impl EncryptedVoteChoice {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Vote {
     choice: EncryptedVoteChoice,
-    pub(super) public_key: PublicKey<Ristretto>,
-    signature: ProofOfPossession<Ristretto>,
+    pub(super) public_key: PublicKey,
+    signature: ProofOfPossession<Group>,
 }
 
 impl Vote {
-    pub fn new(
-        keypair: &Keypair<Ristretto>,
-        poll_id: &PollId,
-        poll: &PollState,
-        choice: &VoteChoice,
-    ) -> Self {
+    pub fn new(keypair: &Keypair, poll_id: &PollId, poll: &PollState, choice: &VoteChoice) -> Self {
         debug_assert_eq!(poll.spec.poll_type, choice.poll_type());
 
         let shared_key = poll.finalized_shared_key().clone();
@@ -163,7 +157,7 @@ impl Vote {
         Self::sign(keypair, poll_id, choice)
     }
 
-    fn sign(keypair: &Keypair<Ristretto>, poll_id: &PollId, choice: EncryptedVoteChoice) -> Self {
+    fn sign(keypair: &Keypair, poll_id: &PollId, choice: EncryptedVoteChoice) -> Self {
         let mut transcript = Self::create_transcript(poll_id, &choice);
         let signature =
             ProofOfPossession::new(slice::from_ref(keypair), &mut transcript, &mut OsRng);
@@ -290,7 +284,7 @@ impl From<Vote> for SubmittedVote {
 }
 
 impl SubmittedVote {
-    pub(super) fn choices(&self) -> &[Ciphertext<Ristretto>] {
+    pub(super) fn choices(&self) -> &[Ciphertext<Group>] {
         self.inner.choice.choices_unchecked()
     }
 }
@@ -298,11 +292,11 @@ impl SubmittedVote {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TallierShare {
     shares: Vec<ShareWithProof>,
-    pub(super) public_key: PublicKey<Ristretto>,
+    pub(super) public_key: PublicKey,
 }
 
 impl TallierShare {
-    pub fn new(keypair: &Keypair<Ristretto>, poll_id: &PollId, poll_state: &PollState) -> Self {
+    pub fn new(keypair: &Keypair, poll_id: &PollId, poll_state: &PollState) -> Self {
         let transcript = Self::create_transcript(poll_id, poll_state);
         let ciphertexts = poll_state.cumulative_choices();
         let shares = ciphertexts.into_iter().map(|ciphertext| {
@@ -329,7 +323,7 @@ impl TallierShare {
         transcript
     }
 
-    pub(super) fn shares(&self) -> impl Iterator<Item = DecryptionShare<Ristretto>> + '_ {
+    pub(super) fn shares(&self) -> impl Iterator<Item = DecryptionShare<Group>> + '_ {
         self.shares
             .iter()
             .map(|share_with_proof| share_with_proof.share.into_unchecked())
@@ -423,8 +417,8 @@ impl TallierShareError {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ShareWithProof {
-    pub(super) share: CandidateShare<Ristretto>,
-    proof: LogEqualityProof<Ristretto>,
+    pub(super) share: CandidateShare<Group>,
+    proof: LogEqualityProof<Group>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

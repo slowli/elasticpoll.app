@@ -1,6 +1,5 @@
 //! [`PollManager`] and [`SecretsManager`].
 
-use elastic_elgamal::{group::Ristretto, Keypair, PublicKey};
 use js_sys::{Error, JsString, Uint8Array};
 use rand_core::OsRng;
 use secrecy::ExposeSecret;
@@ -10,7 +9,7 @@ use wasm_bindgen_futures::JsFuture;
 
 use std::{cell::RefCell, collections::HashMap, future::Future, pin::Pin, rc::Rc, str::FromStr};
 
-use super::{PollId, PollSpec, PollState};
+use super::{Keypair, PollId, PollSpec, PollState, PublicKey};
 use crate::{utils::local_storage, PasswordBasedCrypto};
 
 #[derive(Debug)]
@@ -126,7 +125,7 @@ pub enum SecretManagerStatus {
 pub struct SecretManager {
     storage_key: &'static str,
     state: RefCell<SecretManagerState>,
-    pk_cache: RefCell<HashMap<PollId, PublicKey<Ristretto>>>,
+    pk_cache: RefCell<HashMap<PollId, PublicKey>>,
     crypto: Rc<dyn PasswordBasedCrypto>,
 }
 
@@ -245,7 +244,7 @@ impl SecretManager {
     }
 
     /// Returns `None` if the manager is not unlocked.
-    pub fn keys_for_poll(&self, poll_id: &PollId) -> Option<Keypair<Ristretto>> {
+    pub fn keys_for_poll(&self, poll_id: &PollId) -> Option<Keypair> {
         let state = self.state.borrow();
         let secret = match &*state {
             SecretManagerState::Unlocked(tree) => tree,
@@ -261,7 +260,7 @@ impl SecretManager {
     }
 
     /// Returns `None` if the manager is not unlocked.
-    pub fn public_key_for_poll(&self, poll_id: &PollId) -> Option<PublicKey<Ristretto>> {
+    pub fn public_key_for_poll(&self, poll_id: &PollId) -> Option<PublicKey> {
         let pk = self.pk_cache.borrow().get(poll_id).cloned();
         pk.or_else(|| self.keys_for_poll(poll_id).map(|keys| keys.into_tuple().0))
     }

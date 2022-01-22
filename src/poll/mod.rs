@@ -1,6 +1,6 @@
 //! Poll data types.
 
-use elastic_elgamal::{group::Ristretto, Ciphertext, DiscreteLogTable, PublicKey};
+use elastic_elgamal::{Ciphertext, DiscreteLogTable};
 use js_sys::Date;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -18,6 +18,11 @@ pub use self::participant::{
     Participant, ParticipantApplication, SubmittedTallierShare, SubmittedVote, TallierShare,
     TallierShareError, Vote, VoteChoice, VoteError,
 };
+
+// **NB.** Keep this a single place to define the group.
+pub type Group = elastic_elgamal::group::Ristretto;
+pub type PublicKey = elastic_elgamal::PublicKey<Group>;
+pub type Keypair = elastic_elgamal::Keypair<Group>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -52,7 +57,7 @@ pub struct PollSpec {
     pub title: String,
     pub description: String,
     pub poll_type: PollType,
-    pub nonce: u64,
+    pub nonce: u32,
     #[serde(with = "VecHelper::<String, 1, MAX_OPTIONS>")]
     pub options: Vec<String>,
 }
@@ -141,7 +146,7 @@ pub struct PollState {
     participants: Vec<Participant>,
     /// Shared encryption key for the voting. Only present if the set of participants is final.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    shared_key: Option<PublicKey<Ristretto>>,
+    shared_key: Option<PublicKey>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     tally_result: Option<TallyResult>,
 }
@@ -193,7 +198,7 @@ impl PollState {
         &self.participants
     }
 
-    pub fn has_participant(&self, public_key: &PublicKey<Ristretto>) -> bool {
+    pub fn has_participant(&self, public_key: &PublicKey) -> bool {
         self.participants
             .iter()
             .any(|p| p.public_key() == public_key)
@@ -224,14 +229,14 @@ impl PollState {
         self.participants.remove(index);
     }
 
-    pub fn shared_key(&self) -> Option<PublicKey<Ristretto>> {
+    pub fn shared_key(&self) -> Option<PublicKey> {
         self.participants
             .iter()
             .map(|participant| participant.public_key().clone())
             .reduce(ops::Add::add)
     }
 
-    fn finalized_shared_key(&self) -> &PublicKey<Ristretto> {
+    fn finalized_shared_key(&self) -> &PublicKey {
         self.shared_key
             .as_ref()
             .expect_throw("set of participants is not finalized")
@@ -275,7 +280,7 @@ impl PollState {
         self.tally_result = Some(TallyResult::InProgress);
     }
 
-    pub fn cumulative_choices(&self) -> Vec<Ciphertext<Ristretto>> {
+    pub fn cumulative_choices(&self) -> Vec<Ciphertext<Group>> {
         let mut ciphertexts = vec![Ciphertext::zero(); self.spec.options.len()];
 
         let participant_ciphertexts = self
@@ -327,7 +332,7 @@ impl PollState {
                 }
             }
 
-            let table = DiscreteLogTable::<Ristretto>::new(0..=self.participants.len() as u64);
+            let table = DiscreteLogTable::<Group>::new(0..=self.participants.len() as u64);
             let decrypted_choices = blinded_elements
                 .into_iter()
                 .map(|elt| table.get(&elt).expect("cannot decrypt"))

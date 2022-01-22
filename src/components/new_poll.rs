@@ -5,7 +5,10 @@ use wasm_bindgen::UnwrapThrowExt;
 use web_sys::Event;
 use yew::{classes, html, Callback, Component, Context, Html, Properties};
 
-use super::common::{view_data_row, view_err, Icon, PageMetadata, ValidatedValue};
+use super::{
+    common::{view_data_row, view_err, Icon, PageMetadata, ValidatedValue},
+    AppProperties, ExportedData, ExportedDataType,
+};
 use crate::{
     poll::{PollSpec, PollType, MAX_OPTIONS},
     utils::{value_from_event, value_from_input_event},
@@ -55,8 +58,6 @@ impl NewPollMessage {
 #[derive(Debug, Clone, Default, PartialEq, Properties)]
 pub struct NewPollProperties {
     #[prop_or_default]
-    pub onexport: Callback<String>,
-    #[prop_or_default]
     pub ondone: Callback<PollSpec>,
 }
 
@@ -68,7 +69,7 @@ pub struct NewPoll {
     description: ValidatedValue,
     poll_type: PollType,
     poll_options: Vec<ValidatedValue>,
-    nonce: u64,
+    nonce: u32,
     // The `value` is `Some(_)` if there is a problem with parsing it; otherwise, the "Raw" tab
     // renders the JSON presentation of the config.
     spec: ValidatedValue<Option<String>>,
@@ -535,7 +536,7 @@ impl Component for NewPoll {
     type Properties = NewPollProperties;
 
     fn create(_: &Context<Self>) -> Self {
-        let nonce = OsRng.next_u64();
+        let nonce = OsRng.next_u32();
         Self {
             metadata: PageMetadata {
                 title: "Specifying new poll".to_owned(),
@@ -591,7 +592,10 @@ impl Component for NewPoll {
                 self.reset_spec();
             }
             NewPollMessage::ExportRequested => {
-                ctx.props().onexport.emit(self.spec_string());
+                AppProperties::from_ctx(ctx).onexport.emit(ExportedData {
+                    ty: ExportedDataType::PollSpec,
+                    data: self.spec_string(),
+                });
                 return false;
             }
 

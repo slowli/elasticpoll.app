@@ -1,6 +1,5 @@
 //! Voting page.
 
-use elastic_elgamal::{group::Ristretto, PublicKey};
 use wasm_bindgen::UnwrapThrowExt;
 use web_sys::{Event, HtmlInputElement};
 use yew::{classes, html, Component, Context, Html};
@@ -11,10 +10,10 @@ use super::{
     secrets::Secrets,
     AppProperties, ExportedData, ExportedDataType, Route,
 };
-use crate::poll::SecretManagerStatus;
 use crate::{
     poll::{
-        Participant, PollId, PollManager, PollStage, PollState, SubmittedVote, Vote, VoteChoice,
+        Participant, PollId, PollManager, PollStage, PollState, PublicKey, SecretManagerStatus,
+        SubmittedVote, Vote, VoteChoice,
     },
     utils::{get_event_target, value_from_event, Encode},
 };
@@ -175,7 +174,7 @@ impl Voting {
         idx: usize,
         participant: &Participant,
         vote: &SubmittedVote,
-        our_key: Option<&PublicKey<Ristretto>>,
+        our_key: Option<&PublicKey>,
         ctx: &Context<Self>,
     ) -> Html {
         let title = format!("Voter #{}", idx + 1);

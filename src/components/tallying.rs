@@ -1,20 +1,20 @@
 //! Tallying page.
 
-use elastic_elgamal::{group::Ristretto, PublicKey};
 use wasm_bindgen::UnwrapThrowExt;
 use web_sys::Event;
 use yew::{classes, html, Component, Context, Html};
 use yew_router::prelude::*;
 
 use super::{
-    common::{view_err, Card, Icon, PageMetadata, PollStageProperties, ValidatedValue},
+    common::{
+        view_data_row, view_err, Card, Icon, PageMetadata, PollStageProperties, ValidatedValue,
+    },
     secrets::Secrets,
     AppProperties, ExportedData, ExportedDataType, Route,
 };
-use crate::components::common::view_data_row;
 use crate::{
     poll::{
-        Participant, PollId, PollManager, PollStage, PollState, SecretManagerStatus,
+        Participant, PollId, PollManager, PollStage, PollState, PublicKey, SecretManagerStatus,
         SubmittedTallierShare, TallierShare,
     },
     utils::{value_from_event, Encode},
@@ -155,7 +155,7 @@ impl Tallying {
         idx: usize,
         participant: &Participant,
         share: &SubmittedTallierShare,
-        our_key: Option<&PublicKey<Ristretto>>,
+        our_key: Option<&PublicKey>,
         ctx: &Context<Self>,
     ) -> Html {
         let title = format!("Tallier #{}", idx + 1);

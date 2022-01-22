@@ -1,6 +1,5 @@
 //! Misc utils.
 
-use elastic_elgamal::{group::Ristretto, PublicKey};
 use serde::{
     de::{DeserializeOwned, Error as _, SeqAccess, Visitor},
     Deserializer, Serialize, Serializer,
@@ -9,6 +8,8 @@ use wasm_bindgen::{JsCast, UnwrapThrowExt};
 use web_sys::{Event, HtmlInputElement, HtmlTextAreaElement};
 
 use std::{fmt, marker::PhantomData};
+
+use crate::poll::PublicKey;
 
 pub(crate) struct VecHelper<T, const MIN: usize, const MAX: usize>(PhantomData<T>);
 
@@ -98,7 +99,7 @@ pub(crate) trait Encode {
     fn encode(&self) -> String;
 }
 
-impl Encode for PublicKey<Ristretto> {
+impl Encode for PublicKey {
     fn encode(&self) -> String {
         base64::encode_config(self.as_bytes(), base64::URL_SAFE_NO_PAD)
     }
