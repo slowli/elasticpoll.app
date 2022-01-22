@@ -29,14 +29,14 @@ use crate::{
     ManageModals,
 };
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportedData {
     #[serde(rename = "type")]
     ty: ExportedDataType,
     data: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ExportedDataType {
     PollSpec,

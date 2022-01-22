@@ -3,10 +3,10 @@
 use js_sys::Date;
 use wasm_bindgen::UnwrapThrowExt;
 use web_sys::Event;
-use yew::{classes, html, Callback, Html, Properties};
+use yew::{classes, html, Callback, Html, MouseEvent, Properties};
 use yew_router::prelude::*;
 
-use super::Route;
+use super::{ExportedData, ExportedDataType, Route};
 use crate::poll::{PollId, PollSpec, PollStage, PollState, PollType, VoteChoice};
 
 fn view_local_timestamp(timestamp: f64) -> Html {
@@ -173,7 +173,17 @@ impl Icon {
 type OptionChangeCallback = Callback<(usize, Event)>;
 
 impl PollSpec {
-    pub(super) fn view_summary_card(&self) -> Html {
+    pub(super) fn view_summary_card(&self, onexport: Callback<ExportedData>) -> Html {
+        let exported_data = ExportedData {
+            ty: ExportedDataType::PollSpec,
+            data: serde_json::to_string_pretty(self).expect_throw("cannot serialize `PollSpec`"),
+        };
+        let onexport = onexport.reform(move |evt: MouseEvent| {
+            evt.stop_propagation();
+            evt.prevent_default();
+            exported_data.clone()
+        });
+
         html! {
             <div class="accordion mb-3" id="accordion-poll-summary">
                 <div class="accordion-item">
@@ -185,7 +195,7 @@ impl PollSpec {
                             data-bs-target="#accordion-body-poll-summary"
                             aria-expanded="false"
                             aria-controls="accordion-body-poll-summary">
-                            { "Poll summary" }
+                            { "Poll parameters" }
                         </button>
                     </h4>
                     <div id="accordion-body-poll-summary"
@@ -193,7 +203,16 @@ impl PollSpec {
                         aria-labelledby="accordion-header-poll-summary"
                         data-bs-parent="#accordion-poll-summary">
 
-                        <div class="accordion-body">{ self.view_summary() }</div>
+                        <div class="accordion-body">
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-secondary ms-3 mb-2 float-end"
+                                title="Copy poll parameters to clipboard"
+                                onclick={onexport}>
+                                { Icon::Export.view() }{ " Export" }
+                            </button>
+                            { self.view_summary() }
+                        </div>
                     </div>
                 </div>
             </div>

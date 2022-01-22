@@ -104,13 +104,14 @@ impl Participants {
     }
 
     fn view_poll(&self, state: &PollState, ctx: &Context<Self>) -> Html {
+        let onexport = AppProperties::from_ctx(ctx).onexport;
         html! {
             <>
                 <p class="lead">{ "As a second step, poll participants must be specified." }</p>
                 <p>{ "Participants will act as poll talliers as well. While voting is not \
                     mandatory, tallying is." }</p>
 
-                { state.spec().view_summary_card() }
+                { state.spec().view_summary_card(onexport) }
 
                 <h4>{ "Participants" }</h4>
                 { self.view_add_us_form(state, ctx) }

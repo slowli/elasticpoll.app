@@ -263,12 +263,13 @@ impl Voting {
             })
             .view()
         } else {
+            let onexport = AppProperties::from_ctx(ctx).onexport;
             html! {
                 <>
                     <div class="alert alert-warning" role="alert">
                         { "You are not a poll participant and cannot vote in this poll." }
                     </div>
-                    { state.spec().view_summary_card() }
+                    { state.spec().view_summary_card(onexport) }
                 </>
             }
         }
