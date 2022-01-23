@@ -1,5 +1,6 @@
 //! Poll data types.
 
+use base64ct::{Base64UrlUnpadded, Encoding};
 use elastic_elgamal::{Ciphertext, DiscreteLogTable};
 use js_sys::Date;
 use serde::{Deserialize, Serialize};
@@ -15,8 +16,8 @@ mod participant;
 
 pub use self::managers::{PollManager, SecretManager, SecretManagerStatus};
 pub use self::participant::{
-    Participant, ParticipantApplication, SubmittedTallierShare, SubmittedVote, TallierShare,
-    TallierShareError, Vote, VoteChoice, VoteError,
+    EncryptedVoteChoice, Participant, ParticipantApplication, SubmittedTallierShare, SubmittedVote,
+    TallierShare, TallierShareError, Vote, VoteChoice, VoteError,
 };
 
 // **NB.** Keep this a single place to define the group.
@@ -71,7 +72,7 @@ pub struct PollId([u8; 32]);
 
 impl fmt::Display for PollId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = base64::encode_config(&self.0, base64::URL_SAFE_NO_PAD);
+        let s = Base64UrlUnpadded::encode_string(&self.0);
         formatter.write_str(&s)
     }
 }
@@ -86,8 +87,8 @@ impl FromStr for PollId {
             return Err("Unexpected poll ID length".into());
         }
         let mut buffer = [0_u8; 32];
-        let len = base64::decode_config_slice(s, base64::URL_SAFE_NO_PAD, &mut buffer)?;
-        if len != 32 {
+        let decoded = Base64UrlUnpadded::decode(s, &mut buffer)?;
+        if decoded.len() != 32 {
             return Err("Unexpected poll ID length".into());
         }
         Ok(Self(buffer))
@@ -95,7 +96,7 @@ impl FromStr for PollId {
 }
 
 impl PollId {
-    fn for_spec(spec: &PollSpec) -> Self {
+    pub fn for_spec(spec: &PollSpec) -> Self {
         let json = serde_json::to_string(&spec).expect_throw("cannot serialize `PollSpec`");
         let id = Sha256::digest(json.as_str());
         let mut this = Self([0_u8; 32]);
@@ -152,7 +153,7 @@ pub struct PollState {
 }
 
 impl PollState {
-    fn new(spec: PollSpec) -> Self {
+    pub fn new(spec: PollSpec) -> Self {
         Self {
             spec,
             created_at: Date::now(),

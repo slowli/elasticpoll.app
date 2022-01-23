@@ -1,5 +1,6 @@
 //! [`PollParticipant`] and tightly related types.
 
+use base64ct::{Base64UrlUnpadded, Encoding};
 use elastic_elgamal::{
     app::{ChoiceParams, ChoiceVerificationError, EncryptedChoice, MultiChoice, SingleChoice},
     sharing::{CandidateShare, DecryptionShare},
@@ -115,7 +116,7 @@ impl VoteChoice {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-enum EncryptedVoteChoice {
+pub enum EncryptedVoteChoice {
     SingleChoice(EncryptedChoice<Group, SingleChoice>),
     MultiChoice(EncryptedChoice<Group, MultiChoice>),
 }
@@ -157,7 +158,8 @@ impl Vote {
         Self::sign(keypair, poll_id, choice)
     }
 
-    fn sign(keypair: &Keypair, poll_id: &PollId, choice: EncryptedVoteChoice) -> Self {
+    // Public for testing
+    pub fn sign(keypair: &Keypair, poll_id: &PollId, choice: EncryptedVoteChoice) -> Self {
         let mut transcript = Self::create_transcript(poll_id, &choice);
         let signature =
             ProofOfPossession::new(slice::from_ref(keypair), &mut transcript, &mut OsRng);
@@ -277,7 +279,7 @@ impl From<Vote> for SubmittedVote {
 
         Self {
             inner: vote,
-            hash: base64::encode_config(&vote_hash, base64::URL_SAFE_NO_PAD),
+            hash: Base64UrlUnpadded::encode_string(&vote_hash),
             submitted_at: Date::now(),
         }
     }

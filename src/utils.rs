@@ -1,5 +1,6 @@
 //! Misc utils.
 
+use base64ct::{Base64UrlUnpadded, Encoding};
 use serde::{
     de::{DeserializeOwned, Error as _, SeqAccess, Visitor},
     Deserializer, Serialize, Serializer,
@@ -101,7 +102,7 @@ pub(crate) trait Encode {
 
 impl Encode for PublicKey {
     fn encode(&self) -> String {
-        base64::encode_config(self.as_bytes(), base64::URL_SAFE_NO_PAD)
+        Base64UrlUnpadded::encode_string(self.as_bytes())
     }
 }
 

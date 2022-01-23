@@ -6,7 +6,9 @@
     clippy::non_ascii_literal,
     clippy::module_name_repetitions,
     clippy::must_use_candidate,
-    clippy::needless_pass_by_value
+    clippy::needless_pass_by_value,
+    clippy::missing_panics_doc,
+    clippy::missing_errors_doc
 )]
 
 use wasm_bindgen::{prelude::*, UnwrapThrowExt};
@@ -15,7 +17,7 @@ mod components;
 mod js;
 mod layout;
 mod pages;
-mod poll;
+pub mod poll;
 mod rng;
 mod utils;
 
