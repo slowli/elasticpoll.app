@@ -3,9 +3,11 @@
  */
 
 /* eslint-env serviceworker */
+/* eslint-disable no-restricted-globals -- `self` is expected to be used in workers */
 
 import { precacheAndRoute } from 'workbox-precaching/precacheAndRoute';
 
+// eslint-disable-next-line no-underscore-dangle
 precacheAndRoute(self.__WB_MANIFEST);
 
 const cache = new Map();

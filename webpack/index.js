@@ -49,7 +49,7 @@ if ('serviceWorker' in navigator) {
 
     getCachedBox = async () => {
       await serviceWorker.ready;
-      return await postMessageAsync(serviceWorker.controller, { type: 'GET_CACHE', key: CACHE_KEY });
+      return postMessageAsync(serviceWorker.controller, { type: 'GET_CACHE', key: CACHE_KEY });
     };
     cacheBox = async (value) => {
       await serviceWorker.ready;
@@ -71,7 +71,7 @@ if ('serviceWorker' in navigator) {
 } else {
   // Use a per-page cache (less efficient than with a service worker, since different
   // tabs / windows will have separate caches).
-  let cachedValue = undefined;
+  let cachedValue;
 
   getCachedBox = async () => cachedValue;
   cacheBox = async (value) => {
@@ -83,9 +83,7 @@ import(/* webpackChunkName: "bundle" */ '../pkg').then((wasm) => {
   wasm.runApp({
     onexport: onValueExported,
 
-    sealBox: (password, secretBytes) => {
-      return sealBox(password, secretBytes).then(JSON.stringify);
-    },
+    sealBox: (password, secretBytes) => sealBox(password, secretBytes).then(JSON.stringify),
     getCachedBox,
     openBox: async (password, boxJson) => {
       const secret = await openBox(password, JSON.parse(boxJson));

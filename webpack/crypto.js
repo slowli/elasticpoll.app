@@ -14,7 +14,7 @@ function toHex(bytes) {
     bytes,
     (byte) => {
       const encoded = byte.toString(16);
-      return (encoded.length === 1) ? '0' + encoded : encoded;
+      return (encoded.length === 1) ? `0${encoded}` : encoded;
     },
   ).join('');
 }
@@ -59,7 +59,7 @@ export async function sealBox(password, plaintext) {
       name: 'PBKDF2',
       salt,
       iterations: KDF_ITERATIONS,
-      hash: 'SHA-256'
+      hash: 'SHA-256',
     },
     keyMaterial,
     { name: 'AES-GCM', length: 128 },
@@ -89,12 +89,11 @@ export async function sealBox(password, plaintext) {
 }
 
 export async function openBox(password, box) {
+  const { kdf, cipher, kdfparams: { iterations } } = box;
   let {
-    kdf,
-    cipher,
     ciphertext,
     mac,
-    kdfparams: { salt, iterations },
+    kdfparams: { salt },
     cipherparams: { iv },
   } = box;
 
@@ -122,7 +121,7 @@ export async function openBox(password, box) {
       name: 'PBKDF2',
       salt,
       iterations,
-      hash: 'SHA-256'
+      hash: 'SHA-256',
     },
     keyMaterial,
     { name: 'AES-GCM', length: 128 },
@@ -141,7 +140,7 @@ export async function openBox(password, box) {
       ciphertextWithMac,
     );
     return new Uint8Array(plaintext);
-  } catch(e) {
+  } catch (e) {
     throw new Error('failed decryption (perhaps, the password is incorrect)');
   }
 }

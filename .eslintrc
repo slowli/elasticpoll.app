@@ -11,6 +11,7 @@
   "rules": {
     "max-len": ["error", 100],
     "max-classes-per-file": "off",
+    "no-console": ["error", { "allow": ["warn", "error"] }],
     "object-curly-spacing" : ["error", "always"],
     "import/no-extraneous-dependencies": [
       "error",
