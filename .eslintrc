@@ -16,7 +16,7 @@
     "import/no-extraneous-dependencies": [
       "error",
       {
-        "devDependencies": ["webpack/scripts/**", "*.config.js"]
+        "devDependencies": ["webpack/scripts/**", "webpack/__test__/**", "*.config.js"]
       }
     ],
     "import/no-relative-packages": "off"
