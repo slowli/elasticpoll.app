@@ -14,11 +14,13 @@
 use wasm_bindgen::{prelude::*, UnwrapThrowExt};
 
 mod components;
-mod js;
+pub mod js;
 mod layout;
-mod pages;
+pub mod pages;
 pub mod poll;
 mod rng;
+#[cfg(feature = "testing")]
+pub mod testing;
 mod utils;
 
 use self::{js::JsAppProperties, pages::App};

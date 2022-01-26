@@ -12,7 +12,10 @@ mod participants;
 mod tallying;
 mod voting;
 
-pub use self::app::{App, AppProperties};
+pub use self::{
+    app::{App, AppProperties},
+    new_poll::{NewPoll, NewPollMessage, NewPollProperties},
+};
 
 use crate::poll::{PollId, PollStage, PollState};
 

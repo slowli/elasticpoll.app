@@ -5,6 +5,8 @@ use wasm_bindgen::UnwrapThrowExt;
 use web_sys::Event;
 use yew::{classes, html, Callback, Component, Context, Html, Properties};
 
+#[cfg(feature = "testing")]
+use crate::testing::{ComponentRef, WithComponentRef};
 use crate::{
     js::{ExportedData, ExportedDataType},
     layout::{view_data_row, view_err, Icon},
@@ -58,6 +60,16 @@ impl NewPollMessage {
 pub struct NewPollProperties {
     #[prop_or_default]
     pub ondone: Callback<PollSpec>,
+    #[cfg(feature = "testing")]
+    #[prop_or_default]
+    pub component_ref: ComponentRef<NewPoll>,
+}
+
+#[cfg(feature = "testing")]
+impl WithComponentRef<NewPoll> for NewPollProperties {
+    fn set_component_ref(&mut self, component_ref: ComponentRef<NewPoll>) {
+        self.component_ref = component_ref;
+    }
 }
 
 /// "New poll" page.
@@ -128,8 +140,8 @@ impl NewPoll {
                         class={control_classes}
                         placeholder="Poll description"
                         maxlength={Self::MAX_DESCRIPTION_LEN.to_string()}
+                        value={self.description.value.clone()}
                         onchange={link.callback(|evt| NewPollMessage::description_set(&evt))}>
-                        { &self.desription.value }
                     </textarea>
 
                     { if let Some(err) = &self.description.error_message {
@@ -534,7 +546,14 @@ impl Component for NewPoll {
     type Message = NewPollMessage;
     type Properties = NewPollProperties;
 
-    fn create(_: &Context<Self>) -> Self {
+    #[cfg_attr(not(feature = "testing"), allow(unused_variables))]
+    // ^-- `ctx` is only used to set up the testing harness
+    fn create(ctx: &Context<Self>) -> Self {
+        #[cfg(feature = "testing")]
+        {
+            ctx.props().component_ref.link_with(ctx.link().clone());
+        }
+
         let nonce = OsRng.next_u32();
         Self {
             metadata: PageMetadata {
