@@ -1,10 +1,64 @@
 //! About page.
 
-use yew::{function_component, html};
+use yew::{function_component, html, Html};
 
 use super::PageMetadata;
 
-// TODO: add build details
+#[derive(Debug)]
+struct Package {
+    name: &'static str,
+    version: &'static str,
+    rev: Option<&'static str>,
+    github_repo: Option<&'static str>,
+}
+
+impl Package {
+    fn view_dependency(&self) -> Html {
+        let crate_link = format!(
+            "https://crates.io/crates/{name}/{version}",
+            name = self.name,
+            version = self.version
+        );
+        html! {
+            <li>
+                { self.name }{ " version: " }
+                <a href={crate_link} target="_blank">{ self.version }</a>
+                {if let Some(rev) = self.rev {
+                    let short_rev = &rev[..7];
+                    html!{
+                        <>
+                            { " @ commit " }
+                            {if let Some(repo) = self.github_repo {
+                                let repo_link = format!(
+                                    "https://github.com/{repo}/tree/{rev}",
+                                    repo = repo,
+                                    rev = rev
+                                );
+                                html! {
+                                    <a href={repo_link} target="_blank">{ short_rev }</a>
+                                }
+                            } else {
+                                html!{ short_rev }
+                            }}
+                        </>
+                    }
+                } else {
+                    html!{}
+                }}
+            </li>
+        }
+    }
+}
+
+const MAIN_DEPENDENCIES: &[Package] = include!(concat!(env!("OUT_DIR"), "/main_deps.rs"));
+
+fn view_dependencies() -> Html {
+    MAIN_DEPENDENCIES
+        .iter()
+        .map(Package::view_dependency)
+        .collect()
+}
+
 #[function_component(About)]
 pub fn about_page() -> Html {
     let metadata = PageMetadata {
@@ -54,6 +108,12 @@ pub fn about_page() -> Html {
                 { " for the full list of dependencies and feel welcome to submit changes or \
                   suggest new functionality." }
             </p>
+
+            <h3>{ "Build Info" }</h3>
+            <p><em class="small">{ "Versions of key dependencies to simplify debugging." }</em></p>
+            <ul>
+                { view_dependencies() }
+            </ul>
         </>
     }
 }
