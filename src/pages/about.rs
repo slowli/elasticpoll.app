@@ -59,6 +59,28 @@ fn view_dependencies() -> Html {
         .collect()
 }
 
+#[derive(Debug)]
+struct GitInfo {
+    commit_hash: &'static str,
+}
+
+impl GitInfo {
+    const INSTANCE: Self = include!(concat!(env!("OUT_DIR"), "/git_info.rs"));
+
+    fn view(&self) -> Html {
+        let commit_link = format!(
+            "https://github.com/slowli/elastic-elgamal-site/tree/{}",
+            self.commit_hash
+        );
+        html! {
+            <li>
+                { "Deployed commit: " }
+                <a href={commit_link} target="_blank">{ &self.commit_hash[..7] }</a>
+            </li>
+        }
+    }
+}
+
 #[function_component(About)]
 pub fn about_page() -> Html {
     let metadata = PageMetadata {
@@ -112,6 +134,7 @@ pub fn about_page() -> Html {
             <h3>{ "Build Info" }</h3>
             <p><em class="small">{ "Versions of key dependencies to simplify debugging." }</em></p>
             <ul>
+                { GitInfo::INSTANCE.view() }
                 { view_dependencies() }
             </ul>
         </>
