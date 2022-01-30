@@ -105,7 +105,7 @@ impl PollId {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PollStage {
     Participants { participants: usize },
     Voting { votes: usize, participants: usize },

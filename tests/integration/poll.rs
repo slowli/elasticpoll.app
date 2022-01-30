@@ -3,13 +3,17 @@
 use assert_matches::assert_matches;
 use base64ct::{Base64UrlUnpadded, Encoding};
 use elastic_elgamal::app::ChoiceVerificationError;
-use rand_core::OsRng;
+use rand::{rngs::OsRng, Rng};
+use serde::Serialize;
 use wasm_bindgen::UnwrapThrowExt;
 use wasm_bindgen_test::*;
 
+use std::fmt;
+
 use elasticpoll_wasm::poll::{
     EncryptedVoteChoice, Keypair, ParticipantApplication, PollId, PollSpec, PollStage, PollState,
-    PollType, TallierShare, TallierShareError, Vote, VoteChoice, VoteError,
+    PollType, SubmittedTallierShare, SubmittedVote, TallierShare, TallierShareError, Vote,
+    VoteChoice, VoteError,
 };
 
 fn single_choice_poll() -> PollSpec {
@@ -83,72 +87,148 @@ fn mangle_group_element_works_as_expected() {
     }
 }
 
-#[wasm_bindgen_test]
-fn poll_lifecycle_with_single_participant() {
+/// Marker trait for values with a `submitted_at` timestamp.
+trait WithTimestamp: Serialize + fmt::Debug {}
+
+impl WithTimestamp for SubmittedVote {}
+impl WithTimestamp for SubmittedTallierShare {}
+
+fn assert_eq_ignoring_timestamps<T: WithTimestamp>(lhs: Option<&T>, rhs: Option<&T>) {
+    match (lhs, rhs) {
+        (None, None) => { /* ok */ }
+        (Some(lhs), Some(rhs)) => {
+            let mut lhs_value = serde_json::to_value(lhs).unwrap_throw();
+            lhs_value
+                .as_object_mut()
+                .unwrap_throw()
+                .remove("submitted_at");
+            let mut rhs_value = serde_json::to_value(rhs).unwrap_throw();
+            rhs_value
+                .as_object_mut()
+                .unwrap_throw()
+                .remove("submitted_at");
+            assert_eq!(lhs_value, rhs_value);
+        }
+        _ => panic!("{:?} != {:?}", lhs, rhs),
+    }
+}
+
+fn assert_poll_export(poll: &PollState) {
+    let exported = poll.export();
+    let (_, imported) = PollState::import(exported).unwrap_throw();
+    assert_eq!(imported.stage(), poll.stage());
+
+    let it = poll.participants().iter().zip(imported.participants());
+    for (participant, imported_participant) in it {
+        assert_eq!(participant.public_key(), imported_participant.public_key());
+        assert_eq_ignoring_timestamps(
+            participant.vote.as_ref(),
+            imported_participant.vote.as_ref(),
+        );
+        assert_eq_ignoring_timestamps(
+            participant.tallier_share.as_ref(),
+            imported_participant.tallier_share.as_ref(),
+        );
+    }
+}
+
+fn test_poll_lifecycle(participant_count: usize) {
     let poll_spec = single_choice_poll();
     let poll_id = PollId::for_spec(&poll_spec);
-
     let mut poll = PollState::new(poll_spec);
-    assert_matches!(poll.stage(), PollStage::Participants { participants: 0 });
+    let keys: Vec<_> = (0..participant_count)
+        .map(|_| Keypair::generate(&mut OsRng))
+        .collect();
 
-    let our_keys = Keypair::generate(&mut OsRng);
-    let app = ParticipantApplication::new(&our_keys, &poll_id);
-    app.validate(&poll_id).unwrap();
-
-    poll.insert_participant(app);
-    assert_matches!(poll.stage(), PollStage::Participants { participants: 1 });
-    assert!(poll.has_participant(our_keys.public()));
-
-    let other_app = ParticipantApplication::new(&our_keys, &poll_id);
-    poll.insert_participant(other_app);
-    assert_matches!(poll.stage(), PollStage::Participants { participants: 1 });
+    for our_keys in &keys {
+        let app = ParticipantApplication::new(our_keys, &poll_id);
+        app.validate(&poll_id).unwrap();
+        poll.insert_participant(app);
+    }
+    assert_eq!(
+        poll.stage(),
+        PollStage::Participants {
+            participants: participant_count
+        }
+    );
+    assert_poll_export(&poll);
 
     poll.finalize_participants();
-    assert_matches!(
+    assert_eq!(
         poll.stage(),
         PollStage::Voting {
-            participants: 1,
+            participants: participant_count,
             votes: 0,
         }
     );
 
-    let our_choice = VoteChoice::SingleChoice(1);
-    let vote = Vote::new(&our_keys, &poll_id, &poll, &our_choice);
-    poll.insert_vote(&poll_id, vote).unwrap();
-    assert_matches!(
-        poll.stage(),
-        PollStage::Voting {
-            participants: 1,
-            votes: 1,
-        }
-    );
+    let mut expected_results = vec![0_u64; poll.spec().options.len()];
+    for (i, our_keys) in keys.iter().enumerate() {
+        let our_choice = OsRng.gen_range(0..expected_results.len());
+        expected_results[our_choice] += 1;
+        let our_choice = VoteChoice::SingleChoice(our_choice);
+        let vote = Vote::new(our_keys, &poll_id, &poll, &our_choice);
+        poll.insert_vote(&poll_id, vote).unwrap();
 
-    let new_choice = VoteChoice::SingleChoice(0);
-    let new_vote = Vote::new(&our_keys, &poll_id, &poll, &new_choice);
-    poll.insert_vote(&poll_id, new_vote).unwrap();
-    assert_matches!(
-        poll.stage(),
-        PollStage::Voting {
-            participants: 1,
-            votes: 1,
-        }
-    );
+        assert_eq!(
+            poll.stage(),
+            PollStage::Voting {
+                participants: participant_count,
+                votes: i + 1,
+            }
+        );
+        assert_poll_export(&poll);
+    }
 
     poll.finalize_votes();
-    assert_matches!(
+    assert_eq!(
         poll.stage(),
         PollStage::Tallying {
             shares: 0,
-            participants: 1,
+            participants: participant_count,
         }
     );
 
-    let our_share = TallierShare::new(&our_keys, &poll_id, &poll);
-    poll.insert_tallier_share(&poll_id, our_share).unwrap();
-    assert_matches!(poll.stage(), PollStage::Finished);
+    for (i, our_keys) in keys.iter().enumerate() {
+        let our_share = TallierShare::new(our_keys, &poll_id, &poll);
+        poll.insert_tallier_share(&poll_id, our_share).unwrap();
+
+        if i + 1 < keys.len() {
+            assert_eq!(
+                poll.stage(),
+                PollStage::Tallying {
+                    shares: i + 1,
+                    participants: participant_count,
+                }
+            );
+        } else {
+            assert_eq!(poll.stage(), PollStage::Finished);
+        }
+        assert_poll_export(&poll);
+    }
 
     let results = poll.results().unwrap();
-    assert_eq!(results, [1, 0]);
+    assert_eq!(results, &expected_results);
+}
+
+#[wasm_bindgen_test]
+fn poll_lifecycle_with_single_participant() {
+    test_poll_lifecycle(1);
+}
+
+#[wasm_bindgen_test]
+fn poll_lifecycle_with_2_participants() {
+    test_poll_lifecycle(2);
+}
+
+#[wasm_bindgen_test]
+fn poll_lifecycle_with_3_participants() {
+    test_poll_lifecycle(3);
+}
+
+#[wasm_bindgen_test]
+fn poll_lifecycle_with_5_participants() {
+    test_poll_lifecycle(5);
 }
 
 #[wasm_bindgen_test]
