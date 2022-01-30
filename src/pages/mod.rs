@@ -7,6 +7,7 @@ use yew_router::prelude::*;
 mod about;
 mod app;
 mod home;
+mod implementation;
 mod new_poll;
 mod participants;
 mod tallying;
@@ -26,6 +27,8 @@ pub enum Route {
     Home,
     #[at("/about")]
     About,
+    #[at("/implementation")]
+    Implementation,
 
     #[at("/polls/new")]
     NewPoll,

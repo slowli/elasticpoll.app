@@ -31,7 +31,7 @@ textarea.form-control {
   color: var(--bs-primary);
   margin-bottom: 2rem;
 
-  h1 {
+  .container > div {
     margin: 0 -0.5rem 0 -0.5rem;
     padding: 0 0.5rem 0.5rem;
     border-bottom: 3px solid color.scale($primary, $lightness: 10%);

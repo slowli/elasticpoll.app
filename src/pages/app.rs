@@ -7,8 +7,8 @@ use yew_router::prelude::*;
 use std::rc::Rc;
 
 use super::{
-    about::About, home::Home, new_poll::NewPoll, participants::Participants, tallying::Tallying,
-    voting::Voting, NotFound, Route,
+    about::About, home::Home, implementation::Implementation, new_poll::NewPoll,
+    participants::Participants, tallying::Tallying, voting::Voting, NotFound, Route,
 };
 use crate::{
     js::{ExportedData, ManageModals},
@@ -58,9 +58,16 @@ impl App {
         html! {
             <header class="body-header">
                 <div class="container">
-                    <h1>
-                        <Link<Route> to={ Route::Home } classes="d-block">{ "Voting" }</Link<Route>>
-                    </h1>
+                    <div>
+                        <h1 class="display-4 mb-0">
+                            <Link<Route>
+                                to={ Route::Home }
+                                classes="d-block">{ "Elastic Poll" }</Link<Route>>
+                        </h1>
+                        <div class="text-muted">
+                            { "Cryptographically secure polling app" }
+                        </div>
+                    </div>
                 </div>
             </header>
         }
@@ -79,7 +86,7 @@ impl App {
                         </p>
                         <p>
                             { "This site is open-source! " }
-                            <a href="https://github.com/slowli/elastic-elgamal-site">
+                            <a href="https://github.com/slowli/elasticpoll.app">
                                 { "Contribute on GitHub" }
                             </a>
                         </p>
@@ -88,7 +95,12 @@ impl App {
                         <h5>{ "Useful links" }</h5>
                         <ul class="list-unstyled">
                             <li class="mb-1" title="About this website">
-                                <Link<Route> to={ Route::About }>{ "About" }</Link<Route>>
+                                <Link<Route> to={Route::Implementation}>
+                                    { "Implementation" }
+                                </Link<Route>>
+                            </li>
+                            <li class="mb-1" title="About this website">
+                                <Link<Route> to={Route::About}>{ "About" }</Link<Route>>
                             </li>
                             <li>
                                 <a href="https://crates.io/crates/elastic-elgamal"
@@ -145,6 +157,7 @@ impl Main {
         match route {
             Route::Home => html! { <Home /> },
             Route::About => html! { <About /> },
+            Route::Implementation => html! { <Implementation /> },
             Route::NotFound => html! { <NotFound /> },
 
             Route::NewPoll => html! {

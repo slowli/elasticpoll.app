@@ -166,9 +166,24 @@ impl Component for Home {
         html! {
             <>
                 { self.metadata.view() }
-                <p class="lead">{ "Welcome!" }</p>
-                <p>{ "Lorem ipsum dolor amet. Lorem ipsum dolor amet. Lorem ipsum dolor amet." }</p>
-                <h4>{ "Existing polls" }</h4>
+                <p class="lead">{
+                    "Elastic poll is a small web app that allows organizing single-choice and \
+                     multi-choice polls that combine privacy and universal verifiability with \
+                     the help of some applied cryptography."
+                }</p>
+                <p>
+                    { "The app is packaged as a " }
+                    <a href="https://developer.mozilla.org/en-US/docs/WebAssembly/Concepts">
+                        { "WASM module" }
+                    </a>
+                    { ". No data is exchanged with the server during poll operation; all poll data \
+                      is stored in the local browser storage and can be backed up if necessary. " }
+                    <Link<Route> to={Route::Implementation}>
+                        { "More about implementation and security limitations →" }
+                    </Link<Route>>
+                </p>
+
+                <h4>{ "Polls" }</h4>
                 { self.view_polls(ctx) }
             </>
         }
