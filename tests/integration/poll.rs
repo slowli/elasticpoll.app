@@ -7,7 +7,7 @@ use rand_core::OsRng;
 use wasm_bindgen::UnwrapThrowExt;
 use wasm_bindgen_test::*;
 
-use elastic_elgamal_site::poll::{
+use elasticpoll_wasm::poll::{
     EncryptedVoteChoice, Keypair, ParticipantApplication, PollId, PollSpec, PollStage, PollState,
     PollType, TallierShare, TallierShareError, Vote, VoteChoice, VoteError,
 };

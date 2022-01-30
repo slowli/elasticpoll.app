@@ -125,7 +125,7 @@ impl PageMetadata {
                 <meta name="og:title" content={self.title.clone()} />
                 <meta name="og:description" content={self.description.clone()} />
                 <script type="application/ld+json">{ self.linked_data() }</script>
-                <title>{ &self.title }{ " | Voting" }</title>
+                <title>{ &self.title }{ " | Elastic Poll" }</title>
             </>
         }
     }

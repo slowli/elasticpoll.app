@@ -20,7 +20,7 @@ pub struct PollManager {
 impl Default for PollManager {
     fn default() -> Self {
         Self {
-            storage_key_prefix: "elastic_elgamal_site", // FIXME
+            storage_key_prefix: "elastic_poll",
         }
     }
 }
@@ -132,7 +132,7 @@ pub struct SecretManager {
 impl SecretManager {
     pub fn new(crypto: Rc<dyn PasswordBasedCrypto>) -> Self {
         Self {
-            storage_key: "elastic_elgamal_site::secret", // FIXME
+            storage_key: "elastic_poll::secret",
             state: RefCell::default(),
             pk_cache: RefCell::default(),
             crypto,

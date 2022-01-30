@@ -6,7 +6,7 @@ use wasm_bindgen_test::*;
 use web_sys::{Element, HtmlButtonElement, HtmlInputElement, HtmlTextAreaElement};
 
 use super::{assert_no_child, extract_feedback, select_elements, select_single_element, TestRig};
-use elastic_elgamal_site::{
+use elasticpoll_wasm::{
     js::ExportedDataType,
     pages::{NewPoll, NewPollMessage, NewPollProperties},
     poll::PollSpec,

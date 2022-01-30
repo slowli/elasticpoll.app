@@ -1,6 +1,5 @@
 [package]
-# FIXME: devise a good name
-name = "elastic-elgamal-site"
+name = "elasticpoll-wasm"
 version = "0.0.0"
 authors = ["Alex Ostrovski <ostrovski.alex@gmail.com>"]
 edition = "2021"

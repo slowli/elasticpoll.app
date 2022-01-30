@@ -69,7 +69,7 @@ impl GitInfo {
 
     fn view(&self) -> Html {
         let commit_link = format!(
-            "https://github.com/slowli/elastic-elgamal-site/tree/{}",
+            "https://github.com/slowli/elasticpoll.app/tree/{}",
             self.commit_hash
         );
         html! {
@@ -85,7 +85,7 @@ impl GitInfo {
 pub fn about_page() -> Html {
     let metadata = PageMetadata {
         title: "About the app".to_owned(),
-        description: "??? is a fully contained WASM web app allowing to hold polls \
+        description: "Elastic Poll is a fully contained WASM web app allowing to hold polls \
             in a cryptographically secure and private manner. \
             This page lists main technologies about the app and some debugging info."
             .to_owned(),
@@ -126,7 +126,7 @@ pub fn about_page() -> Html {
             </ul>
             <p>
                 { "This website is fully open source! See " }
-                <a href="https://github.com/slowli/elastic-elgamal-site">{ "its source code" }</a>
+                <a href="https://github.com/slowli/elasticpoll.app">{ "its source code" }</a>
                 { " for the full list of dependencies and feel welcome to submit changes or \
                   suggest new functionality." }
             </p>

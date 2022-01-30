@@ -8,7 +8,7 @@ use yew::{html, Callback, Component, Context, ContextProvider, Html};
 
 use std::{cell::RefCell, marker::PhantomData, rc::Rc};
 
-use elastic_elgamal_site::{
+use elasticpoll_wasm::{
     js::{ExportedData, ManageModals, PasswordBasedCrypto},
     pages::AppProperties,
     poll::SecretManager,
