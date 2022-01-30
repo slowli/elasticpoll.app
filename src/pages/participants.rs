@@ -104,9 +104,15 @@ impl Participants {
         let onexport = AppProperties::from_ctx(ctx).onexport;
         html! {
             <>
-                <p class="lead">{ "As a second step, poll participants must be specified." }</p>
-                <p>{ "Participants will act as poll talliers as well. While voting is not \
-                    mandatory, tallying is." }</p>
+                <p class="lead">{ "After poll is created, poll participants must be specified." }</p>
+                <p>{ "The participants can submit votes (potentially multiple times, but only \
+                the last one will be counted). The participants are also talliers, \
+                and must submit tallying shares once the voting stage is finished." }</p>
+                <p>
+                    <Link<Route> to={Route::Implementation}>
+                        { "More about participants →" }
+                    </Link<Route>>
+                </p>
 
                 { state.spec().view_summary_card(onexport) }
 

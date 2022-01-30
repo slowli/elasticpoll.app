@@ -94,8 +94,16 @@ impl Tallying {
         html! {
             <>
                 <p class="lead">{ "The final poll stage is tallying." }</p>
-                <p>{ "Each participant must submit a tallying share, which when combined \
-                    allow to decrypt the cumulative votes." }</p>
+                <p>{ "Each participant must submit a tallying share. \
+                Shares contain no private information and can be freely exchanged via a reliable \
+                broadcast channel (e.g., Telegram or Slack). \
+                When shares from all participants are present, they will be automatically combined \
+                to decrypt the cumulative option totals." }</p>
+                <p>
+                    <Link<Route> to={Route::Implementation}>
+                        { "More about the voting protocol →" }
+                    </Link<Route>>
+                </p>
 
                 <h4>{ "Shares" }</h4>
                 { Self::view_secrets_alert(ctx) }

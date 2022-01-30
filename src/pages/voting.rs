@@ -117,7 +117,17 @@ impl Voting {
             <>
                 <p class="lead">{ "After the set of participants is finalized, \
                     voting can commence." }</p>
-                <p>{ "Each participant can submit a vote an unlimited number of times." }</p>
+                <p>{ "Each participant can submit a vote an unlimited number of times \
+                (only one of these submissions will be tallied) or not submit it at all. \
+                Votes contain no private information and can be freely exchanged via a reliable \
+                broadcast channel (e.g., Telegram or Slack).
+                To sync votes among participant, note that \
+                each vote has a hash digest and the voter’s public key." }</p>
+                <p>
+                    <Link<Route> to={Route::Implementation}>
+                        { "More about the voting protocol →" }
+                    </Link<Route>>
+                </p>
 
                 <h4>{ "Votes" }</h4>
                 { Self::view_secrets_alert(ctx) }
