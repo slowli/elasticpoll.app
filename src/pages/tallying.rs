@@ -313,7 +313,7 @@ impl Component for Tallying {
                 return false;
             }
             TallyingMessage::SecretUpdated => {
-                return self.maybe_submit_our_share(ctx).is_some();
+                self.maybe_submit_our_share(ctx);
             }
         }
         true

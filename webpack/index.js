@@ -43,19 +43,19 @@ let getCachedBox = null;
 let cacheBox = null;
 
 if ('serviceWorker' in navigator) {
+  const { serviceWorker } = navigator;
+
+  getCachedBox = async () => {
+    await serviceWorker.ready;
+    return postMessageAsync(serviceWorker.controller, { type: 'GET_CACHE', key: CACHE_KEY });
+  };
+  cacheBox = async (value) => {
+    await serviceWorker.ready;
+    serviceWorker.controller.postMessage({ type: 'SET_CACHE', key: CACHE_KEY, value });
+  };
+
   window.addEventListener('load', () => {
-    const { serviceWorker } = navigator;
     serviceWorker.register(SERVICE_WORKER_URL).catch(console.error);
-
-    getCachedBox = async () => {
-      await serviceWorker.ready;
-      return postMessageAsync(serviceWorker.controller, { type: 'GET_CACHE', key: CACHE_KEY });
-    };
-    cacheBox = async (value) => {
-      await serviceWorker.ready;
-      serviceWorker.controller.postMessage({ type: 'SET_CACHE', key: CACHE_KEY, value });
-    };
-
     serviceWorker.ready.then(() => {
       // Periodically ping the worker so it does not get terminated while the page is active.
       // This is necessary because the root secret is stored in the worker's RAM
