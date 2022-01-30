@@ -9,7 +9,7 @@ use wasm_bindgen::UnwrapThrowExt;
 
 use std::{error::Error as StdError, fmt, ops, str::FromStr};
 
-use crate::utils::VecHelper;
+use crate::utils::{Encode, VecHelper};
 
 mod managers;
 mod participant;
@@ -53,7 +53,7 @@ impl FromStr for PollType {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PollSpec {
     pub title: String,
     pub description: String,
@@ -105,7 +105,6 @@ impl PollId {
     }
 }
 
-// TODO: add specification
 #[derive(Debug, Clone, Copy)]
 pub enum PollStage {
     Participants { participants: usize },
@@ -132,6 +131,7 @@ impl PollStage {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 enum TallyResult {
     InProgress,
     Finished(Vec<u64>),
@@ -321,25 +321,28 @@ impl PollState {
 
         let all_shares_are_collected = self.participants.iter().all(|p| p.tallier_share.is_some());
         if all_shares_are_collected {
-            let mut blinded_elements: Vec<_> = self
-                .cumulative_choices()
-                .into_iter()
-                .map(|ciphertext| *ciphertext.blinded_element())
-                .collect();
-            for participant in &self.participants {
-                let share = &participant.tallier_share.as_ref().unwrap_throw().inner;
-                for (dest, src) in blinded_elements.iter_mut().zip(share.shares()) {
-                    *dest -= src.as_element();
-                }
-            }
-
-            let table = DiscreteLogTable::<Group>::new(0..=self.participants.len() as u64);
-            let decrypted_choices = blinded_elements
-                .into_iter()
-                .map(|elt| table.get(&elt).expect("cannot decrypt"))
-                .collect();
-            self.tally_result = Some(TallyResult::Finished(decrypted_choices));
+            self.tally_result = Some(TallyResult::Finished(self.tally_results()));
         }
+    }
+
+    fn tally_results(&self) -> Vec<u64> {
+        let mut blinded_elements: Vec<_> = self
+            .cumulative_choices()
+            .into_iter()
+            .map(|ciphertext| *ciphertext.blinded_element())
+            .collect();
+        for participant in &self.participants {
+            let share = &participant.tallier_share.as_ref().unwrap_throw().inner;
+            for (dest, src) in blinded_elements.iter_mut().zip(share.shares()) {
+                *dest -= src.as_element();
+            }
+        }
+
+        let table = DiscreteLogTable::<Group>::new(0..=self.participants.len() as u64);
+        blinded_elements
+            .into_iter()
+            .map(|elt| table.get(&elt).expect("cannot decrypt"))
+            .collect()
     }
 
     pub fn results(&self) -> Option<&[u64]> {
@@ -347,6 +350,128 @@ impl PollState {
             Some(results)
         } else {
             None
+        }
+    }
+
+    pub fn export(&self) -> ExportedPoll {
+        ExportedPoll {
+            spec: self.spec.clone(),
+            participant_applications: self
+                .participants
+                .iter()
+                .map(|p| p.application.clone())
+                .collect(),
+            votes: self
+                .participants
+                .iter()
+                .filter_map(|p| p.vote.as_ref().map(|vote| vote.inner.clone()))
+                .collect(),
+            tallier_shares: self
+                .participants
+                .iter()
+                .filter_map(|p| p.tallier_share.as_ref().map(|share| share.inner.clone()))
+                .collect(),
+        }
+    }
+
+    pub fn import(exported_poll: ExportedPoll) -> Result<(PollId, Self), PollValidationError> {
+        let poll_id = PollId::for_spec(&exported_poll.spec);
+        let mut poll = PollState::new(exported_poll.spec);
+
+        for participant in exported_poll.participant_applications {
+            let key = participant.public_key.clone();
+            participant
+                .validate(&poll_id)
+                .map_err(|err| PollValidationError::Application { key, err })?;
+            poll.insert_participant(participant);
+        }
+
+        if exported_poll.votes.is_empty() {
+            if !exported_poll.tallier_shares.is_empty() {
+                return Err(PollValidationError::UnexpectedShares);
+            }
+            return Ok((poll_id, poll));
+        }
+
+        poll.finalize_participants();
+        for vote in exported_poll.votes {
+            let key = vote.public_key.clone();
+            poll.insert_vote(&poll_id, vote)
+                .map_err(|err| PollValidationError::Vote { key, err })?;
+        }
+
+        if !exported_poll.tallier_shares.is_empty() {
+            poll.finalize_votes();
+        }
+        for tallier_share in exported_poll.tallier_shares {
+            let key = tallier_share.public_key.clone();
+            poll.insert_tallier_share(&poll_id, tallier_share)
+                .map_err(|err| PollValidationError::TallierShare { key, err })?;
+        }
+
+        Ok((poll_id, poll))
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ExportedPoll {
+    spec: PollSpec,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    participant_applications: Vec<ParticipantApplication>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    votes: Vec<Vote>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    tallier_shares: Vec<TallierShare>,
+}
+
+#[derive(Debug)]
+pub enum PollValidationError {
+    Application {
+        key: PublicKey,
+        err: Box<dyn StdError>,
+    },
+    Vote {
+        key: PublicKey,
+        err: VoteError,
+    },
+    TallierShare {
+        key: PublicKey,
+        err: TallierShareError,
+    },
+    UnexpectedShares,
+}
+
+impl fmt::Display for PollValidationError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Application { key, err } => {
+                write!(
+                    formatter,
+                    "cannot validate application for participant {}: {}",
+                    key.encode(),
+                    err
+                )
+            }
+            Self::Vote { key, err } => {
+                write!(
+                    formatter,
+                    "cannot validate vote for participant {}: {}",
+                    key.encode(),
+                    err
+                )
+            }
+            Self::TallierShare { key, err } => {
+                write!(
+                    formatter,
+                    "cannot validate tallier share for participant {}: {}",
+                    key.encode(),
+                    err
+                )
+            }
+
+            Self::UnexpectedShares => {
+                formatter.write_str("tallier shares present even when votes are not")
+            }
         }
     }
 }

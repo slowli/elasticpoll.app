@@ -17,7 +17,7 @@ use std::{error::Error as StdError, fmt, iter, slice};
 
 use super::{Group, Keypair, PollId, PollSpec, PollState, PollType, PublicKey};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParticipantApplication {
     pub public_key: PublicKey,
     pub participation_consent: ProofOfPossession<Group>,
@@ -114,7 +114,7 @@ impl VoteChoice {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EncryptedVoteChoice {
     SingleChoice(EncryptedChoice<Group, SingleChoice>),
@@ -130,7 +130,7 @@ impl EncryptedVoteChoice {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Vote {
     choice: EncryptedVoteChoice,
     pub(super) public_key: PublicKey,
@@ -291,7 +291,7 @@ impl SubmittedVote {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TallierShare {
     shares: Vec<ShareWithProof>,
     pub(super) public_key: PublicKey,
@@ -417,7 +417,7 @@ impl TallierShareError {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct ShareWithProof {
     pub(super) share: CandidateShare<Group>,
     proof: LogEqualityProof<Group>,

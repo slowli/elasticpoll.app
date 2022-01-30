@@ -20,6 +20,7 @@ pub struct ExportedData {
 #[serde(rename_all = "snake_case")]
 pub enum ExportedDataType {
     PollSpec,
+    PollState,
     Application,
     Vote,
     TallierShare,

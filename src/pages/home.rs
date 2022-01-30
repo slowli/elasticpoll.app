@@ -1,17 +1,29 @@
 //! Home page.
 
+use wasm_bindgen::UnwrapThrowExt;
+use web_sys::Event;
 use yew::{classes, html, Component, Context, Html};
 use yew_router::prelude::*;
 
 use crate::{
-    layout::{Card, Icon},
-    pages::{PageMetadata, Route},
-    poll::{PollId, PollManager, PollStage, PollState},
+    js::{ExportedData, ExportedDataType},
+    layout::{view_err, Card, Icon},
+    pages::{AppProperties, PageMetadata, Route},
+    poll::{ExportedPoll, PollId, PollManager, PollStage, PollState},
+    utils::{value_from_event, ValidatedValue},
 };
 
 #[derive(Debug)]
 pub enum HomeMessage {
+    PollSet(String),
+    ExportRequested(PollId),
     RemovalRequested(PollId),
+}
+
+impl HomeMessage {
+    fn poll_set(event: &Event) -> Self {
+        Self::PollSet(value_from_event(event))
+    }
 }
 
 /// Home page component.
@@ -19,9 +31,36 @@ pub enum HomeMessage {
 pub struct Home {
     poll_manager: PollManager,
     metadata: PageMetadata,
+    new_poll: ValidatedValue,
 }
 
 impl Home {
+    fn set_poll(&mut self, poll: String) {
+        let parsed_poll = match serde_json::from_str::<ExportedPoll>(&poll) {
+            Ok(poll) => poll,
+            Err(err) => {
+                self.new_poll = ValidatedValue {
+                    value: poll,
+                    error_message: Some(format!("Error parsing poll: {}", err)),
+                };
+                return;
+            }
+        };
+
+        let (poll_id, imported_poll) = match PollState::import(parsed_poll) {
+            Ok(value) => value,
+            Err(err) => {
+                self.new_poll = ValidatedValue {
+                    value: poll,
+                    error_message: Some(format!("Error validating poll: {}", err)),
+                };
+                return;
+            }
+        };
+        self.poll_manager.update_poll(&poll_id, &imported_poll);
+        self.new_poll = ValidatedValue::default();
+    }
+
     fn view_polls(&self, ctx: &Context<Self>) -> Html {
         let polls = self.poll_manager.polls();
         let polls: Html = polls
@@ -35,13 +74,15 @@ impl Home {
                 <div class="row g-2 mb-2">
                     { polls }
                 </div>
-                <div>
+                <div class="mb-3">
                     <Link<Route>
                         to={Route::NewPoll}
                         classes={classes!["btn", "btn-outline-primary"]}>
                         {Icon::Plus.view()}{ " Create new poll" }
                     </Link<Route>>
                 </div>
+                <h5 class="text-muted">{ "Import poll" }</h5>
+                { self.view_poll_import_form(ctx) }
             </>
         }
     }
@@ -72,7 +113,7 @@ impl Home {
         );
 
         let continue_text = if matches!(poll_stage, PollStage::Finished) {
-            "View results"
+            "Results"
         } else {
             "Continue"
         };
@@ -83,6 +124,15 @@ impl Home {
                     classes={classes!["btn", "btn-sm", "btn-primary", "me-2"]}>
                     { continue_text }
                 </Link<Route>>
+            })
+            .with_button(html! {
+                <button
+                    type="button"
+                    class="btn btn-sm btn-secondary me-2"
+                    title="Copy poll state to clipboard"
+                    onclick={link.callback(move |_| HomeMessage::ExportRequested(id))}>
+                    { Icon::Export.view() }{ " Export" }
+                </button>
             })
             .with_button(html! {
                 <button
@@ -133,6 +183,31 @@ impl Home {
             }
         }
     }
+
+    fn view_poll_import_form(&self, ctx: &Context<Self>) -> Html {
+        let mut control_classes = classes!["form-control", "font-monospace", "small", "mb-1"];
+        if self.new_poll.error_message.is_some() {
+            control_classes.push("is-invalid");
+        }
+
+        let link = ctx.link();
+        html! {
+            <form>
+                <textarea
+                    id="encoded-poll"
+                    class={control_classes}
+                    placeholder="JSON-encoded poll state"
+                    value={self.new_poll.value.clone()}
+                    onchange={link.callback(|evt| HomeMessage::poll_set(&evt))}>
+                </textarea>
+                { if let Some(err) = &self.new_poll.error_message {
+                    view_err(err)
+                } else {
+                    html!{}
+                }}
+            </form>
+        }
+    }
 }
 
 impl Component for Home {
@@ -149,14 +224,29 @@ impl Component for Home {
                 is_root: true,
             },
             poll_manager: PollManager::default(),
+            new_poll: ValidatedValue::default(),
         }
     }
 
-    fn update(&mut self, _: &Context<Self>, msg: Self::Message) -> bool {
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
+            HomeMessage::PollSet(poll) => {
+                self.set_poll(poll);
+            }
             HomeMessage::RemovalRequested(id) => {
                 // FIXME: confirm via dialog or toast
                 self.poll_manager.remove_poll(&id);
+            }
+            HomeMessage::ExportRequested(id) => {
+                if let Some(poll) = self.poll_manager.poll(&id) {
+                    let data = serde_json::to_string_pretty(&poll.export())
+                        .expect_throw("Cannot serialize `ExportedPoll`");
+                    AppProperties::from_ctx(ctx).onexport.emit(ExportedData {
+                        ty: ExportedDataType::PollState,
+                        data,
+                    });
+                    return false;
+                }
             }
         }
         true
