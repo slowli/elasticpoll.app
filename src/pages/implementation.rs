@@ -5,7 +5,7 @@ use super::PageMetadata;
 #[function_component(Implementation)]
 pub fn implementation_page() -> Html {
     let metadata = PageMetadata {
-        title: "Implementation details and security models".to_owned(),
+        title: "Implementation details".to_owned(),
         description: "Elastic Poll is a fully contained WASM web app allowing to hold polls \
             in a cryptographically secure and private manner. \
             This page describes how the app works and its limitations."
@@ -26,7 +26,7 @@ pub fn implementation_page() -> Html {
                 <p class="mb-0">
                     { "Cryptography behind the app was not independently audited, in particular \
                     against side-channel (e.g., timing) attacks. The app is provided without \
-                    any warranty or liability as specified in the " }
+                    any warranty or liability as per the " }
                     <a href="https://www.apache.org/licenses/LICENSE-2.0"
                         class="alert-link">
                         { "Apache 2.0 license" }
@@ -37,13 +37,14 @@ pub fn implementation_page() -> Html {
             <p>
                 { "The polling process consists of 4 stages: specifying a poll, selecting \
                 participants, submitting votes and tallying results. Because of serverless \
-                architecture, there is no tamper-proof bulletin available to all participants \
-                where these stages are performed. As such, " }
+                nature of the app, there is no tamper-proof bulletin board available \
+                to all participants where these stages are performed. As such, " }
                 <strong>
-                    { "participants need to use an external bulletin of their choosing," }
+                    { "participants need to use an external bulletin of their choosing." }
                 </strong>
-                { " such as a Telegram group or a Slack channel \
-                (or maybe a blockchain). The app does provide reference values allowing \
+                { " A Telegram group or a Slack channel should do at least for toy use cases \
+                (a paranoid option would be a public blockchain). \
+                The app does provide reference values allowing \
                 to understand whether the necessary data is synced among participants." }
             </p>
 
@@ -109,30 +110,29 @@ pub fn implementation_page() -> Html {
                 <li>
                     <strong>{ "Simplicity of initialization:" }</strong>
                     { " N-of-N tallier scheme is significantly easier to initialize than a generic \
-                        M-of-N scheme. The latter would require performing a verifiable secret \
-                        sharing or distributed key generation protocol." }
+                    M-of-N scheme. The latter would require performing a verifiable secret \
+                    sharing or distributed key generation protocol." }
                 </li>
                 <li>
                     <strong>{ "Strong privacy guarantees:" }</strong>
                     { " It is impossible to decrypt any separate vote without the voter’s consent." }
                 </li>
             </ul>
-            <p>
-                { "Each participant has a Ristretto255 keypair to sign their votes \
-                (i.e., prove that the vote \
-                comes from an eligible voter), and to submit a tallying share. \
-                (Tallying shares do not need additional authentication since they contain \
-                a sufficient zero-knowledge proof of authenticity.) \
-                When combined, shares from all participants (and no less than all participants!) \
-                would allow to decrypt vote results. The shared public key used to encrypt \
-                votes is the simple sum of all participants’ public keys. Correspondingly, \
-                tallying shares (i.e., a vector of Diffie–Hellman multiplications \
-                of the participant’s private key with the random elements \
-                of all the tallied option ciphertexts) \
-                are combined by summing as well. To prevent rogue key \
-                attacks, a participant application contains, along with a public key, \
-                a zero-knowledge proof of ownership of the corresponding secret key." }
-            </p>
+
+            <p>{ "Each participant has a Ristretto255 keypair to sign their votes \
+            (i.e., prove that the vote \
+            comes from an eligible voter), and to submit a tallying share. \
+            Tallying shares do not need additional authentication since they contain \
+            a sufficient zero-knowledge proof of authenticity." }</p>
+            <p>{ "When combined, shares from all participants (and no less than all participants!) \
+            would allow to decrypt vote results. The shared public key used to encrypt \
+            votes is the simple sum of all participants’ public keys. Correspondingly, \
+            tallying shares (i.e., a vector of Diffie–Hellman combinations \
+            of the participant’s private key with the random elements \
+            of all the tallied option ciphertexts) \
+            are combined by summing as well. To prevent rogue key \
+            attacks, a participant application contains, along with a public key, \
+            a zero-knowledge proof of ownership of the corresponding secret key." }</p>
         </>
     }
 }
