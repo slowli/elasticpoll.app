@@ -106,10 +106,11 @@ module.exports = (env, argv) => {
       new MkdirpProviderPlugin(),
       new PrerenderSPAPlugin({
         staticDir: path.join(__dirname, 'dist'),
-        routes: ['/', '/about'],
+        routes: ['/', '/about', '/implementation'],
         renderer: new Renderer({
-          renderAfterTime: 2000, // TODO: replace with an event
-          headless: false,
+          injectProperty: '__PRERENDER__',
+          inject: {}, // we don't need any properties, just for the global var to be set
+          renderAfterDocumentEvent: 'wasm-rendered',
         }),
       }),
     );

@@ -99,4 +99,8 @@ import(/* webpackChunkName: "bundle" */ '../pkg').then((wasm) => {
       }
     },
   });
+
+  if ('__PRERENDER__' in window) {
+    document.dispatchEvent(new Event('wasm-rendered'));
+  }
 });

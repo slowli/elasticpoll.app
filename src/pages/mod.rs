@@ -139,7 +139,7 @@ impl PageMetadata {
                 \"@context\":\"https://schema.org/\",\
                 \"@type\":\"{ty}\",\
                 \"author\":{{\
-                  \"@type\":\"Person\",
+                  \"@type\":\"Person\",\
                   \"name\":\"Alex Ostrovski\"\
                 }},\
                 \"headline\":\"{title}\",\
