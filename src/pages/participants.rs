@@ -5,14 +5,16 @@ use web_sys::Event;
 use yew::{classes, html, Component, Context, Html};
 use yew_router::prelude::*;
 
+use std::collections::HashSet;
+
 use crate::{
     components::Secrets,
     js::{ExportedData, ExportedDataType},
-    layout::{view_data_row, view_err, Card, Icon},
+    layout::{view_data_row, view_err, Card, Icon, RemovalMessage},
     pages::{AppProperties, PageMetadata, PollStageProperties, Route},
     poll::{
-        Participant, ParticipantApplication, PollId, PollManager, PollStage, PollState,
-        SecretManagerStatus,
+        Participant, ParticipantApplication, PollId, PollManager, PollStage, PollState, PublicKey,
+        PublicKeyBytes, SecretManagerStatus,
     },
     utils::{value_from_event, Encode, ValidatedValue},
 };
@@ -20,7 +22,7 @@ use crate::{
 #[derive(Debug)]
 pub enum ParticipantsMessage {
     ApplicationSet(String),
-    ParticipantRemoved(usize),
+    Removal(RemovalMessage<PublicKeyBytes>),
     UsAdded,
     ExportRequested(usize),
     SecretUpdated,
@@ -33,6 +35,12 @@ impl ParticipantsMessage {
     }
 }
 
+impl From<RemovalMessage<PublicKeyBytes>> for ParticipantsMessage {
+    fn from(message: RemovalMessage<PublicKeyBytes>) -> Self {
+        Self::Removal(message)
+    }
+}
+
 #[derive(Debug)]
 pub struct Participants {
     metadata: PageMetadata,
@@ -42,6 +50,7 @@ pub struct Participants {
     is_readonly: bool,
     new_application: ValidatedValue,
     validated_application: Option<ParticipantApplication>,
+    pending_removals: HashSet<PublicKeyBytes>,
 }
 
 impl Participants {
@@ -61,10 +70,16 @@ impl Participants {
         }
     }
 
-    fn remove_participant(&mut self, idx: usize) {
+    fn remove_participant(&mut self, key_bytes: &PublicKeyBytes) {
         if let Some(state) = &mut self.poll_state {
-            state.remove_participant(idx);
-            self.poll_manager.update_poll(&self.poll_id, state);
+            let idx = state
+                .participants()
+                .iter()
+                .position(|p| p.public_key().as_bytes() == key_bytes);
+            if let Some(idx) = idx {
+                state.remove_participant(idx);
+                self.poll_manager.update_poll(&self.poll_id, state);
+            }
         }
     }
 
@@ -125,12 +140,16 @@ impl Participants {
     }
 
     fn view_participants(&self, state: &PollState, ctx: &Context<Self>) -> Html {
+        let our_key = AppProperties::from_ctx(ctx)
+            .secrets
+            .public_key_for_poll(&self.poll_id);
+
         let participants: Html = state
             .participants()
             .iter()
             .enumerate()
             .map(|(idx, participant)| {
-                let card = self.view_participant(idx, participant, ctx);
+                let card = self.view_participant(idx, participant, our_key.as_ref(), ctx);
                 html! { <div class="col-lg-6">{ card }</div> }
             })
             .collect();
@@ -147,7 +166,16 @@ impl Participants {
         }
     }
 
-    fn view_participant(&self, idx: usize, participant: &Participant, ctx: &Context<Self>) -> Html {
+    fn view_participant(
+        &self,
+        idx: usize,
+        participant: &Participant,
+        our_key: Option<&PublicKey>,
+        ctx: &Context<Self>,
+    ) -> Html {
+        let is_pending_removal = self
+            .pending_removals
+            .contains(participant.public_key().as_bytes());
         let title = format!("#{}", idx + 1);
         let mut card = Card::new(
             html! { title },
@@ -160,17 +188,18 @@ impl Participants {
             },
         );
 
-        let our_key = AppProperties::from_ctx(ctx)
-            .secrets
-            .public_key_for_poll(&self.poll_id);
-        if our_key.as_ref() == Some(participant.public_key()) {
+        let link = ctx.link();
+        let key_bytes = participant.public_key_bytes();
+        if is_pending_removal {
+            card = card.confirm_removal(key_bytes, link);
+        }
+        if our_key == Some(participant.public_key()) {
             card = card.with_our_mark();
         }
+        card = card.with_timestamp(participant.created_at);
 
-        let link = ctx.link();
-        card = card
-            .with_timestamp(participant.created_at)
-            .with_button(html! {
+        if !is_pending_removal {
+            card = card.with_button(html! {
                 <button
                     type="button"
                     class="btn btn-sm btn-secondary me-2"
@@ -182,19 +211,19 @@ impl Participants {
                 </button>
             });
 
-        if !self.is_readonly {
-            card = card.with_button(html! {
-                <button
-                    type="button"
-                    class="btn btn-sm btn-danger"
-                    title="Remove this participant"
-                    onclick={link.callback(move |_| {
-                        ParticipantsMessage::ParticipantRemoved(idx)
-                    })}>
-                    { Icon::Remove.view() }{ " Remove" }
-                </button>
-            });
+            if !self.is_readonly {
+                card = card.with_button(html! {
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-danger"
+                        title="Remove this participant"
+                        onclick={link.callback(move |_| RemovalMessage::Requested(key_bytes))}>
+                        { Icon::Remove.view() }{ " Remove" }
+                    </button>
+                });
+            }
         }
+
         card.view()
     }
 
@@ -314,6 +343,7 @@ impl Component for Participants {
             is_readonly,
             new_application: ValidatedValue::default(),
             validated_application: None,
+            pending_removals: HashSet::new(),
         }
     }
 
@@ -322,9 +352,18 @@ impl Component for Participants {
             ParticipantsMessage::ApplicationSet(application) => {
                 self.set_application(application);
             }
-            ParticipantsMessage::ParticipantRemoved(idx) => {
-                self.remove_participant(idx);
+
+            ParticipantsMessage::Removal(RemovalMessage::Requested(key_bytes)) => {
+                self.pending_removals.insert(key_bytes);
             }
+            ParticipantsMessage::Removal(RemovalMessage::Cancelled(key_bytes)) => {
+                self.pending_removals.remove(&key_bytes);
+            }
+            ParticipantsMessage::Removal(RemovalMessage::Confirmed(key_bytes)) => {
+                self.remove_participant(&key_bytes);
+                self.pending_removals.remove(&key_bytes);
+            }
+
             ParticipantsMessage::UsAdded => {
                 let us = self.create_our_participant(ctx);
                 self.add_participant(us);

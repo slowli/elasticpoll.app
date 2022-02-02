@@ -5,9 +5,11 @@ use web_sys::Event;
 use yew::{classes, html, Component, Context, Html};
 use yew_router::prelude::*;
 
+use std::{cmp::Ordering, collections::HashSet};
+
 use crate::{
     js::{ExportedData, ExportedDataType},
-    layout::{view_err, Card, Icon},
+    layout::{view_err, Card, Icon, RemovalMessage},
     pages::{AppProperties, PageMetadata, Route},
     poll::{ExportedPoll, PollId, PollManager, PollStage, PollState},
     utils::{value_from_event, ValidatedValue},
@@ -17,12 +19,18 @@ use crate::{
 pub enum HomeMessage {
     PollSet(String),
     ExportRequested(PollId),
-    RemovalRequested(PollId),
+    Removal(RemovalMessage<PollId>),
 }
 
 impl HomeMessage {
     fn poll_set(event: &Event) -> Self {
         Self::PollSet(value_from_event(event))
+    }
+}
+
+impl From<RemovalMessage<PollId>> for HomeMessage {
+    fn from(message: RemovalMessage<PollId>) -> Self {
+        Self::Removal(message)
     }
 }
 
@@ -32,6 +40,7 @@ pub struct Home {
     poll_manager: PollManager,
     metadata: PageMetadata,
     new_poll: ValidatedValue,
+    pending_removals: HashSet<PollId>,
 }
 
 impl Home {
@@ -62,11 +71,17 @@ impl Home {
     }
 
     fn view_polls(&self, ctx: &Context<Self>) -> Html {
-        let polls = self.poll_manager.polls();
+        let mut polls = self.poll_manager.polls();
+        polls.sort_unstable_by(|(_, poll), (_, other_poll)| {
+            poll.created_at
+                .partial_cmp(&other_poll.created_at)
+                .unwrap_or(Ordering::Equal)
+        });
+
         let polls: Html = polls
             .into_iter()
             .map(|(id, state)| {
-                html! { <div class="col-lg-6">{ Self::view_poll(id, &state, ctx) }</div> }
+                html! { <div class="col-lg-6">{ self.view_poll(id, &state, ctx) }</div> }
             })
             .collect();
         html! {
@@ -88,12 +103,13 @@ impl Home {
     }
 
     #[allow(clippy::cast_precision_loss)]
-    fn view_poll(id: PollId, state: &PollState, ctx: &Context<Self>) -> Html {
+    fn view_poll(&self, id: PollId, state: &PollState, ctx: &Context<Self>) -> Html {
         let poll_stage = state.stage();
         let progress_percent = (poll_stage.index() as f64 / PollStage::MAX_INDEX as f64) * 100.0;
+        let is_pending_removal = self.pending_removals.contains(&id);
 
         let link = ctx.link();
-        let card = Card::new(
+        let mut card = Card::new(
             html! { &state.spec().title },
             html! {
                 <>
@@ -111,39 +127,45 @@ impl Home {
                 </>
             },
         );
+        if is_pending_removal {
+            card = card.confirm_removal(id, link);
+        }
 
         let continue_text = if matches!(poll_stage, PollStage::Finished) {
             "Results"
         } else {
             "Continue"
         };
-        card.with_timestamp(state.created_at)
-            .with_button(html! {
-                <Link<Route>
-                    to={Route::for_poll(id, poll_stage)}
-                    classes={classes!["btn", "btn-sm", "btn-primary", "me-2"]}>
-                    { continue_text }
-                </Link<Route>>
-            })
-            .with_button(html! {
-                <button
-                    type="button"
-                    class="btn btn-sm btn-secondary me-2"
-                    title="Copy poll state to clipboard"
-                    onclick={link.callback(move |_| HomeMessage::ExportRequested(id))}>
-                    { Icon::Export.view() }{ " Export" }
-                </button>
-            })
-            .with_button(html! {
-                <button
-                    type="button"
-                    class="btn btn-sm btn-danger"
-                    title="Remove this poll"
-                    onclick={link.callback(move |_| HomeMessage::RemovalRequested(id))}>
-                    { Icon::Remove.view() }{ " Remove" }
-                </button>
-            })
-            .view()
+        let mut card = card.with_timestamp(state.created_at);
+        if !is_pending_removal {
+            card = card
+                .with_button(html! {
+                    <Link<Route>
+                        to={Route::for_poll(id, poll_stage)}
+                        classes={classes!["btn", "btn-sm", "btn-primary", "me-2"]}>
+                        { continue_text }
+                    </Link<Route>>
+                })
+                .with_button(html! {
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-secondary me-2"
+                        title="Copy poll state to clipboard"
+                        onclick={link.callback(move |_| HomeMessage::ExportRequested(id))}>
+                        { Icon::Export.view() }{ " Export" }
+                    </button>
+                })
+                .with_button(html! {
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-danger"
+                        title="Remove this poll"
+                        onclick={link.callback(move |_| RemovalMessage::Requested(id))}>
+                        { Icon::Remove.view() }{ " Remove" }
+                    </button>
+                });
+        };
+        card.view()
     }
 
     fn view_poll_stage(stage: PollStage) -> Html {
@@ -225,6 +247,7 @@ impl Component for Home {
             },
             poll_manager: PollManager::default(),
             new_poll: ValidatedValue::default(),
+            pending_removals: HashSet::new(),
         }
     }
 
@@ -233,10 +256,18 @@ impl Component for Home {
             HomeMessage::PollSet(poll) => {
                 self.set_poll(poll);
             }
-            HomeMessage::RemovalRequested(id) => {
-                // FIXME: confirm via dialog or toast
-                self.poll_manager.remove_poll(&id);
+
+            HomeMessage::Removal(RemovalMessage::Requested(id)) => {
+                self.pending_removals.insert(id);
             }
+            HomeMessage::Removal(RemovalMessage::Confirmed(id)) => {
+                self.poll_manager.remove_poll(&id);
+                self.pending_removals.remove(&id);
+            }
+            HomeMessage::Removal(RemovalMessage::Cancelled(id)) => {
+                self.pending_removals.remove(&id);
+            }
+
             HomeMessage::ExportRequested(id) => {
                 if let Some(poll) = self.poll_manager.poll(&id) {
                     let data = serde_json::to_string_pretty(&poll.export())

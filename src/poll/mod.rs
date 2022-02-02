@@ -23,6 +23,7 @@ pub use self::participant::{
 // **NB.** Keep this a single place to define the group.
 pub type Group = elastic_elgamal::group::Ristretto;
 pub type PublicKey = elastic_elgamal::PublicKey<Group>;
+pub type PublicKeyBytes = [u8; 32];
 pub type Keypair = elastic_elgamal::Keypair<Group>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]

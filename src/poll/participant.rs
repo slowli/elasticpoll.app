@@ -13,9 +13,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use wasm_bindgen::UnwrapThrowExt;
 
-use std::{error::Error as StdError, fmt, iter, slice};
+use std::{convert::TryFrom, error::Error as StdError, fmt, iter, slice};
 
-use super::{Group, Keypair, PollId, PollSpec, PollState, PollType, PublicKey};
+use super::{Group, Keypair, PollId, PollSpec, PollState, PollType, PublicKey, PublicKeyBytes};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParticipantApplication {
@@ -68,6 +68,11 @@ impl From<ParticipantApplication> for Participant {
 impl Participant {
     pub fn public_key(&self) -> &PublicKey {
         &self.application.public_key
+    }
+
+    pub fn public_key_bytes(&self) -> PublicKeyBytes {
+        PublicKeyBytes::try_from(self.public_key().as_bytes())
+            .expect_throw("unexpected public key byte size")
     }
 }
 

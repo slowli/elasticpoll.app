@@ -40,7 +40,7 @@ impl PollManager {
     }
 
     /// Lists polls together with the respective IDs.
-    pub fn polls(&self) -> HashMap<PollId, PollState> {
+    pub fn polls(&self) -> Vec<(PollId, PollState)> {
         let local_storage = local_storage();
         // This iteration protocol assumes that the storage is not modified concurrently.
         let len = local_storage

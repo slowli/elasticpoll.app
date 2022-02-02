@@ -3,7 +3,7 @@
 use js_sys::Date;
 use wasm_bindgen::UnwrapThrowExt;
 use web_sys::Event;
-use yew::{classes, html, Callback, Html, MouseEvent};
+use yew::{classes, html, html::Scope, Callback, Component, Html, MouseEvent};
 
 use crate::{
     js::{ExportedData, ExportedDataType},
@@ -34,10 +34,19 @@ pub fn view_err(message: &str) -> Html {
     }
 }
 
+/// Shared messages for the removal flow (request, then cancellation or confirmation).
+#[derive(Debug)]
+pub enum RemovalMessage<T> {
+    Requested(T),
+    Confirmed(T),
+    Cancelled(T),
+}
+
 #[derive(Debug)]
 pub struct Card {
     our_mark: bool,
     dotted_border: bool,
+    confirming_removal: bool,
     title: Html,
     timestamp: Option<f64>,
     body: Html,
@@ -49,6 +58,7 @@ impl Card {
         Self {
             our_mark: false,
             dotted_border: false,
+            confirming_removal: false,
             title,
             timestamp: None,
             body,
@@ -76,22 +86,62 @@ impl Card {
         self
     }
 
+    pub fn confirm_removal<C, T>(mut self, id: T, link: &Scope<C>) -> Self
+    where
+        C: Component,
+        C::Message: From<RemovalMessage<T>>,
+        T: 'static + Copy,
+    {
+        self.confirming_removal = true;
+        self.buttons.push(html! {
+            <button
+                type="button"
+                class="btn btn-sm btn-secondary me-2"
+                title="Cancel removal"
+                onclick={link.callback(move |_| RemovalMessage::Cancelled(id))}>
+                { Icon::Reset.view() }{ " Cancel" }
+            </button>
+        });
+        self.buttons.push(html! {
+            <button
+                type="button"
+                class="btn btn-sm btn-danger"
+                title="Confirm removal"
+                onclick={link.callback(move |_| RemovalMessage::Confirmed(id))}>
+                { Icon::Remove.view() }{ " Remove" }
+            </button>
+        });
+        self
+    }
+
     pub fn view(self) -> Html {
         let mut card_classes = classes!["card", "h-100"];
         if self.dotted_border {
             card_classes.push("border-2");
             card_classes.push("border-dotted");
         }
+        if self.confirming_removal {
+            card_classes.push("border-danger");
+        }
+
         let our_mark = if self.our_mark {
             html! { <span class="badge bg-primary position-absolute ms-2">{ "You" }</span> }
         } else {
             html! {}
         };
 
+        let title = if self.confirming_removal {
+            html! {
+                <span class="text-danger">{ "Removing: "}{ self.title }</span>
+            }
+        } else {
+            self.title
+        };
+
         html! {
             <div class={card_classes}>
                 <div class="card-body">
-                    <h5 class="card-title text-truncate">{ self.title }{ our_mark }</h5>
+                    <h5 class="card-title text-truncate">{ title }{ our_mark }</h5>
                     { if let Some(timestamp) = self.timestamp {
                         html! {
                             <p class="card-subtitle mb-2 small text-muted">
