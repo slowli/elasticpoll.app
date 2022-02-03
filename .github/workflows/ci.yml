@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Cache cargo build
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target
+
+      - name: Install Node.js
+        uses: actions/setup-node@v1
+        with:
+          node-version: 16.x
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.3.0
+        with:
+          version: latest
+
+      - run: npm ci
+
+      # Rust-related lints
+      - name: Format Rust code
+        run: "npm run lint:fmt"
+      - name: Clippy
+        uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features --all-targets -- -D warnings
+
+      # Tests
+      - name: Test JS wrapper
+        run: "npm run test:js"
+      - name: Test WASM
+        run: "npm run test:wasm -- --chrome --firefox --all-features"
+
+      # Build intermediate artifact & check that the Webpack build works.
+      - name: Build website
+        run: "npm run build"
+
+      # Frontend lints
+      - name: Lint JS code
+        run: "npm run lint:js"
+      - name: Lint styles
+        run: "npm run lint:scss"
