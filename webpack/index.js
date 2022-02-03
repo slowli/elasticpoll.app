@@ -91,6 +91,11 @@ import(/* webpackChunkName: "bundle" */ '../pkg').then((wasm) => {
       return secret;
     },
 
+    showModal: (elementId) => {
+      const element = document.getElementById(elementId);
+      const modal = Modal.getOrCreateInstance(element);
+      modal.show();
+    },
     hideModal: (elementId) => {
       const element = document.getElementById(elementId);
       const modal = Modal.getInstance(element);

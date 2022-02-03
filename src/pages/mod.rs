@@ -158,6 +158,8 @@ pub struct PollStageProperties {
     pub id: PollId,
     #[prop_or_default]
     pub ondone: Callback<PollState>,
+    #[prop_or_default]
+    pub onrollback: Callback<PollState>,
 }
 
 #[function_component(NotFound)]

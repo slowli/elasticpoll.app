@@ -1,5 +1,6 @@
 //! Non-page components.
 
+mod rollback;
 mod secrets;
 
-pub use self::secrets::Secrets;
+pub use self::{rollback::Rollback, secrets::Secrets};

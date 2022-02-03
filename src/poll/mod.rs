@@ -248,6 +248,14 @@ impl PollState {
         self.shared_key = self.shared_key();
     }
 
+    pub fn rollback_to_participants_selection(&mut self) {
+        self.rollback_to_voting();
+        self.shared_key = None;
+        for participant in &mut self.participants {
+            participant.vote = None;
+        }
+    }
+
     pub fn contains_votes(&self) -> bool {
         self.participants
             .iter()
@@ -280,6 +288,13 @@ impl PollState {
 
     pub fn finalize_votes(&mut self) {
         self.tally_result = Some(TallyResult::InProgress);
+    }
+
+    pub fn rollback_to_voting(&mut self) {
+        self.tally_result = None;
+        for participant in &mut self.participants {
+            participant.tallier_share = None;
+        }
     }
 
     pub fn cumulative_choices(&self) -> Vec<Ciphertext<Group>> {

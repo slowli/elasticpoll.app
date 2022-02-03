@@ -46,7 +46,9 @@ impl AppProperties {
 pub enum AppMessage {
     PollCreated(PollSpec),
     ParticipantsFinalized(PollId, Box<PollState>),
+    RolledBackToParticipants(PollId, Box<PollState>),
     VotesFinalized(PollId, Box<PollState>),
+    RolledBackToVoting(PollId, Box<PollState>),
 }
 
 /// Root application component.
@@ -180,12 +182,22 @@ impl Main {
                         id={id}
                         ondone={link.callback(move |state| {
                             AppMessage::VotesFinalized(id, Box::new(state))
+                        })}
+                        onrollback={link.callback(move |state| {
+                            AppMessage::RolledBackToParticipants(id, Box::new(state))
                         })} />
                 }
             }
-            Route::Tallying { id } => html! {
-                <Tallying id={*id} />
-            },
+            Route::Tallying { id } => {
+                let id = *id;
+                html! {
+                    <Tallying
+                        id={id}
+                        onrollback={link.callback(move |state| {
+                            AppMessage::RolledBackToVoting(id, Box::new(state))
+                        })} />
+                }
+            }
         }
     }
 }
@@ -212,6 +224,11 @@ impl Component for Main {
                 self.poll_manager.update_poll(&id, &state);
                 history.push(Route::Voting { id });
             }
+            AppMessage::RolledBackToParticipants(id, mut state) => {
+                state.rollback_to_participants_selection();
+                self.poll_manager.update_poll(&id, &state);
+                history.push(Route::PollParticipants { id });
+            }
             AppMessage::VotesFinalized(id, mut state) => {
                 state.finalize_votes();
                 let our_keys = ctx.props().secrets.keys_for_poll(&id);
@@ -223,6 +240,11 @@ impl Component for Main {
                 }
                 self.poll_manager.update_poll(&id, &state);
                 history.push(Route::Tallying { id });
+            }
+            AppMessage::RolledBackToVoting(id, mut state) => {
+                state.rollback_to_voting();
+                self.poll_manager.update_poll(&id, &state);
+                history.push(Route::Voting { id });
             }
         }
         true

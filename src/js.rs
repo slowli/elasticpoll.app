@@ -52,6 +52,7 @@ impl fmt::Debug for dyn PasswordBasedCrypto {
 }
 
 pub trait ManageModals {
+    fn show_modal(&self, element_id: &str);
     fn hide_modal(&self, element_id: &str);
 }
 
@@ -65,6 +66,9 @@ impl fmt::Debug for dyn ManageModals {
 extern "C" {
     #[wasm_bindgen(js_name = AppProperties)]
     pub type JsAppProperties;
+
+    #[wasm_bindgen(structural, method, js_name = showModal)]
+    fn show_modal(this: &JsAppProperties, element_id: &str);
 
     #[wasm_bindgen(structural, method, js_name = hideModal)]
     fn hide_modal(this: &JsAppProperties, element_id: &str);
@@ -97,6 +101,10 @@ impl PasswordBasedCrypto for JsAppProperties {
 }
 
 impl ManageModals for JsAppProperties {
+    fn show_modal(&self, element_id: &str) {
+        self.show_modal(element_id);
+    }
+
     fn hide_modal(&self, element_id: &str) {
         self.hide_modal(element_id);
     }

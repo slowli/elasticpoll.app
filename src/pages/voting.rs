@@ -6,7 +6,7 @@ use yew::{classes, html, Component, Context, Html};
 use yew_router::prelude::*;
 
 use crate::{
-    components::Secrets,
+    components::{Rollback, Secrets},
     js::{ExportedData, ExportedDataType},
     layout::{view_err, Card, Icon},
     pages::{AppProperties, PageMetadata, PollStageProperties, Route},
@@ -25,6 +25,8 @@ pub enum VotingMessage {
     ExportRequested(usize),
     SecretUpdated,
     Done,
+    RollbackRequested,
+    Rollback,
 }
 
 impl VotingMessage {
@@ -347,6 +349,26 @@ impl Component for Voting {
                 ctx.props().ondone.emit(state);
                 return false; // There will be a redirect; no need to re-render this page.
             }
+            VotingMessage::RollbackRequested => {
+                let state = self.poll_state.as_ref().expect_throw("no poll state");
+                let is_safe_to_rollback = state.participants().iter().all(|p| p.vote.is_none());
+
+                if is_safe_to_rollback {
+                    let state = self.poll_state.take().expect_throw("no poll state");
+                    ctx.props().onrollback.emit(state);
+                } else {
+                    // Confirm rollback via a modal.
+                    AppProperties::from_ctx(ctx)
+                        .modals
+                        .show_modal(Rollback::MODAL_ID);
+                }
+                return false;
+            }
+            VotingMessage::Rollback => {
+                let state = self.poll_state.take().expect_throw("no poll state");
+                ctx.props().onrollback.emit(state);
+                return false; // There will be a redirect; no need to re-render this page.
+            }
         }
         true
     }
@@ -372,12 +394,23 @@ impl Component for Voting {
                                 <div class="mt-4 text-center">
                                     <button
                                         type="button"
+                                        class="btn btn-warning me-2"
+                                        title="Roll poll back to participants selection"
+                                        onclick={link.callback(|_| VotingMessage::RollbackRequested)}>
+                                        { Icon::Reset.view() }{ " Prev: participants" }
+                                    </button>
+                                    <button
+                                        type="button"
                                         class="btn btn-primary"
                                         disabled={no_votes}
                                         onclick={link.callback(|_| VotingMessage::Done)}>
                                         { Icon::Check.view() }{ " Next: tallying" }
                                     </button>
                                 </div>
+                                <Rollback
+                                    removed_entities="votes"
+                                    changed_entities="participants"
+                                    onconfirmed={link.callback(|_| VotingMessage::Rollback)} />
                             </>
                         }
                     }}

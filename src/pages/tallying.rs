@@ -6,7 +6,7 @@ use yew::{classes, html, Component, Context, Html};
 use yew_router::prelude::*;
 
 use crate::{
-    components::Secrets,
+    components::{Rollback, Secrets},
     js::{ExportedData, ExportedDataType},
     layout::{view_data_row, view_err, Card, Icon},
     pages::{AppProperties, PageMetadata, PollStageProperties, Route},
@@ -22,6 +22,8 @@ pub enum TallyingMessage {
     ShareSet(String),
     ExportRequested(usize),
     SecretUpdated,
+    RollbackRequested,
+    Rollback,
 }
 
 impl TallyingMessage {
@@ -315,6 +317,29 @@ impl Component for Tallying {
             TallyingMessage::SecretUpdated => {
                 self.maybe_submit_our_share(ctx);
             }
+            TallyingMessage::RollbackRequested => {
+                let state = self.poll_state.as_ref().expect_throw("no poll state");
+                let is_safe_to_rollback = state
+                    .participants()
+                    .iter()
+                    .all(|p| p.tallier_share.is_none());
+
+                if is_safe_to_rollback {
+                    let state = self.poll_state.take().expect_throw("no poll state");
+                    ctx.props().onrollback.emit(state);
+                } else {
+                    // Confirm rollback via a modal.
+                    AppProperties::from_ctx(ctx)
+                        .modals
+                        .show_modal(Rollback::MODAL_ID);
+                }
+                return false;
+            }
+            TallyingMessage::Rollback => {
+                let state = self.poll_state.take().expect_throw("no poll state");
+                ctx.props().onrollback.emit(state);
+                return false; // There will be a redirect; no need to re-render this page.
+            }
         }
         true
     }
@@ -326,10 +351,32 @@ impl Component for Tallying {
                     { self.metadata.view() }
                     { state.stage().view_nav(PollStage::TALLYING_IDX, self.poll_id) }
                     { self.view_poll(state, ctx) }
+
                     { if let Some(results) = state.results() {
                         Self::view_results(state, results)
-                    } else {
+                    } else if self.is_readonly {
                         html!{}
+                    } else {
+                        let link = ctx.link();
+                        html! {
+                            <>
+                                <div class="mt-4 text-center">
+                                    <button
+                                        type="button"
+                                        class="btn btn-warning me-2"
+                                        title="Roll poll back to voting"
+                                        onclick={link.callback(|_| {
+                                            TallyingMessage::RollbackRequested
+                                        })}>
+                                        { Icon::Reset.view() }{ " Prev: voting" }
+                                    </button>
+                                </div>
+                                <Rollback
+                                    removed_entities="tallying shares"
+                                    changed_entities="votes"
+                                    onconfirmed={link.callback(|_| TallyingMessage::Rollback)} />
+                            </>
+                        }
                     }}
                 </>
             }

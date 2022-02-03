@@ -45,6 +45,10 @@ impl PasswordBasedCrypto for MockCrypto {
 struct MockModals;
 
 impl ManageModals for MockModals {
+    fn show_modal(&self, _: &str) {
+        // do nothing
+    }
+
     fn hide_modal(&self, _: &str) {
         // do nothing
     }
