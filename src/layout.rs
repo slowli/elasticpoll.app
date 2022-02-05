@@ -199,7 +199,7 @@ impl Icon {
 type OptionChangeCallback = Callback<(usize, Event)>;
 
 impl PollSpec {
-    pub fn view_summary_card(&self, onexport: Callback<ExportedData>) -> Html {
+    pub fn view_summary_card(&self, onexport: &Callback<ExportedData>) -> Html {
         let exported_data = ExportedData {
             ty: ExportedDataType::PollSpec,
             data: serde_json::to_string_pretty(self).expect_throw("cannot serialize `PollSpec`"),
@@ -254,11 +254,11 @@ impl PollSpec {
         }
     }
 
-    pub fn view_as_form(&self, choice: &VoteChoice, onchange: OptionChangeCallback) -> Html {
+    pub fn view_as_form(&self, choice: &VoteChoice, onchange: &OptionChangeCallback) -> Html {
         self.view(Some(choice), Some(onchange))
     }
 
-    fn view(&self, choice: Option<&VoteChoice>, onchange: Option<OptionChangeCallback>) -> Html {
+    fn view(&self, choice: Option<&VoteChoice>, onchange: Option<&OptionChangeCallback>) -> Html {
         let ty = self.poll_type;
         let options = self
             .options
@@ -266,7 +266,7 @@ impl PollSpec {
             .enumerate()
             .map(|(idx, option)| {
                 let is_selected = choice.map(|choice| choice.is_selected(idx));
-                Self::view_option(idx, option, ty, is_selected, onchange.clone())
+                Self::view_option(idx, option, ty, is_selected, onchange.cloned())
             })
             .collect::<Html>();
         html! {

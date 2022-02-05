@@ -1,14 +1,14 @@
 #![recursion_limit = "512"]
 // Linter settings.
-#![warn(missing_debug_implementations, bare_trait_objects)]
+#![warn(missing_debug_implementations, bare_trait_objects, rust_2018_idioms)]
 #![warn(clippy::all, clippy::pedantic)]
 #![allow(
     clippy::non_ascii_literal,
     clippy::module_name_repetitions,
     clippy::must_use_candidate,
-    clippy::needless_pass_by_value,
     clippy::missing_panics_doc,
-    clippy::missing_errors_doc
+    clippy::missing_errors_doc,
+    clippy::unused_unit // emitted by `wasm_bindgen` macro
 )]
 
 use wasm_bindgen::{prelude::*, UnwrapThrowExt};

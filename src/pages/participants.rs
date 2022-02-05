@@ -116,7 +116,7 @@ impl Participants {
     }
 
     fn view_poll(&self, state: &PollState, ctx: &Context<Self>) -> Html {
-        let onexport = AppProperties::from_ctx(ctx).onexport;
+        let props = AppProperties::from_ctx(ctx);
         html! {
             <>
                 <p class="lead">{ "After poll is created, poll participants must be specified." }</p>
@@ -129,7 +129,7 @@ impl Participants {
                     </Link<Route>>
                 </p>
 
-                { state.spec().view_summary_card(onexport) }
+                { state.spec().view_summary_card(&props.onexport) }
 
                 <h4>{ "Participants" }</h4>
                 { self.view_add_us_form(state, ctx) }

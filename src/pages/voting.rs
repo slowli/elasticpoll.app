@@ -260,7 +260,7 @@ impl Voting {
             let on_change = link.callback(|(idx, evt)| VotingMessage::option_selected(idx, &evt));
             let card = Card::new(
                 html! { &state.spec().title },
-                state.spec().view_as_form(choice, on_change),
+                state.spec().view_as_form(choice, &on_change),
             );
 
             card.with_button(html! {
@@ -273,13 +273,13 @@ impl Voting {
             })
             .view()
         } else {
-            let onexport = AppProperties::from_ctx(ctx).onexport;
+            let props = AppProperties::from_ctx(ctx);
             html! {
                 <>
                     <div class="alert alert-warning" role="alert">
                         { "You are not a poll participant and cannot vote in this poll." }
                     </div>
-                    { state.spec().view_summary_card(onexport) }
+                    { state.spec().view_summary_card(&props.onexport) }
                 </>
             }
         }
