@@ -3,8 +3,8 @@
 use base64ct::{Base64UrlUnpadded, Encoding};
 use elastic_elgamal::{
     app::{ChoiceParams, ChoiceVerificationError, EncryptedChoice, MultiChoice, SingleChoice},
-    sharing::{CandidateShare, DecryptionShare},
-    Ciphertext, LogEqualityProof, ProofOfPossession, VerificationError,
+    CandidateDecryption, Ciphertext, LogEqualityProof, ProofOfPossession, VerifiableDecryption,
+    VerificationError,
 };
 use js_sys::Date;
 use merlin::Transcript;
@@ -308,7 +308,7 @@ impl TallierShare {
         let ciphertexts = poll_state.cumulative_choices();
         let shares = ciphertexts.into_iter().map(|ciphertext| {
             let (share, proof) =
-                DecryptionShare::new(ciphertext, keypair, &mut transcript.clone(), &mut OsRng);
+                VerifiableDecryption::new(ciphertext, keypair, &mut transcript.clone(), &mut OsRng);
             ShareWithProof {
                 share: share.into(),
                 proof,
@@ -330,7 +330,7 @@ impl TallierShare {
         transcript
     }
 
-    pub(super) fn shares(&self) -> impl Iterator<Item = DecryptionShare<Group>> + '_ {
+    pub(super) fn shares(&self) -> impl Iterator<Item = VerifiableDecryption<Group>> + '_ {
         self.shares
             .iter()
             .map(|share_with_proof| share_with_proof.share.into_unchecked())
@@ -424,7 +424,7 @@ impl TallierShareError {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ShareWithProof {
-    pub(super) share: CandidateShare<Group>,
+    pub(super) share: CandidateDecryption<Group>,
     proof: LogEqualityProof<Group>,
 }
 
