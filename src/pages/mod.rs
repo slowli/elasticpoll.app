@@ -1,6 +1,6 @@
 //! Application page components.
 
-use wasm_bindgen::UnwrapThrowExt;
+use wasm_bindgen::{JsValue, UnwrapThrowExt};
 use yew::{classes, function_component, html, Callback, Html, Properties};
 use yew_router::prelude::*;
 
@@ -113,22 +113,49 @@ pub struct PageMetadata {
 }
 
 impl PageMetadata {
-    // TODO: probably will duplicate data in case of prerendering
     pub fn view(&self) -> Html {
         let window = web_sys::window().expect_throw("no Window");
         let document = window.document().expect_throw("no Document");
         let head = document.head().expect_throw("no <head> in Document");
-        yew::create_portal(self.view_meta(), head.into())
+        let prerender = JsValue::from_str("__PRERENDER__").js_in(&window);
+
+        if !prerender {
+            // Remove prerendered versions of the attributes. If this is not the first
+            // rendering of page meta, this is a no-op.
+            let prerendered_elements = head.query_selector_all(".prerender").unwrap_throw();
+            for i in 0..prerendered_elements.length() {
+                if let Some(node) = prerendered_elements.item(i) {
+                    head.remove_child(&node).ok();
+                }
+            }
+        }
+        yew::create_portal(self.view_meta(prerender), head.into())
     }
 
-    fn view_meta(&self) -> Html {
+    fn view_meta(&self, prerender: bool) -> Html {
+        let element_classes = if prerender {
+            classes!["prerender"]
+        } else {
+            classes![]
+        };
         html! {
             <>
-                <meta name="description" content={self.description.clone()} />
-                <meta name="og:title" content={self.title.clone()} />
-                <meta name="og:description" content={self.description.clone()} />
-                <script type="application/ld+json">{ self.linked_data() }</script>
-                <title>{ &self.title }{ " | Elastic Poll" }</title>
+                <meta
+                    class={element_classes.clone()}
+                    name="description"
+                    content={self.description.clone()} />
+                <meta
+                    class={element_classes.clone()}
+                    name="og:title"
+                    content={self.title.clone()} />
+                <meta
+                    class={element_classes.clone()}
+                    name="og:description"
+                    content={self.description.clone()} />
+                <script class={element_classes.clone()} type="application/ld+json">
+                    { self.linked_data() }
+                </script>
+                <title class={element_classes}>{ &self.title }{ " | Elastic Poll" }</title>
             </>
         }
     }
