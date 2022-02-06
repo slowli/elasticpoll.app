@@ -2,7 +2,7 @@
 
 use wasm_bindgen::UnwrapThrowExt;
 use web_sys::Event;
-use yew::{classes, html, Component, Context, Html};
+use yew::{classes, html, Component, Context, Html, NodeRef};
 use yew_router::prelude::*;
 
 use std::collections::HashSet;
@@ -24,7 +24,7 @@ pub enum ParticipantsMessage {
     ApplicationSet(String),
     Removal(RemovalMessage<PublicKeyBytes>),
     UsAdded,
-    ExportRequested(usize),
+    ExportRequested(usize, NodeRef),
     SecretUpdated,
     Done,
 }
@@ -199,13 +199,14 @@ impl Participants {
         card = card.with_timestamp(participant.created_at);
 
         if !is_pending_removal {
+            let export_button_ref = NodeRef::default();
             card = card.with_button(html! {
                 <button
+                    ref={export_button_ref.clone()}
                     type="button"
                     class="btn btn-sm btn-secondary me-2"
-                    title="Copy participant application to clipboard"
                     onclick={link.callback(move |_| {
-                        ParticipantsMessage::ExportRequested(idx)
+                        ParticipantsMessage::ExportRequested(idx, export_button_ref.clone())
                     })}>
                     { Icon::Export.view() }{ " Export" }
                 </button>
@@ -368,15 +369,17 @@ impl Component for Participants {
                 let us = self.create_our_participant(ctx);
                 self.add_participant(us);
             }
-            ParticipantsMessage::ExportRequested(idx) => {
+            ParticipantsMessage::ExportRequested(idx, target) => {
                 if let Some(state) = &self.poll_state {
                     let app = &state.participants()[idx].application;
                     let app = serde_json::to_string_pretty(app)
                         .expect_throw("failed serializing `ParticipantApplication`");
-                    AppProperties::from_ctx(ctx).onexport.emit(ExportedData {
+                    let data = ExportedData {
                         ty: ExportedDataType::Application,
                         data: app,
-                    });
+                    };
+                    let target = target.cast().unwrap_throw();
+                    AppProperties::from_ctx(ctx).onexport.emit((data, target));
                 }
                 return false;
             }

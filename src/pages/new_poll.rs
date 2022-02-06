@@ -3,7 +3,7 @@
 use rand_core::{OsRng, RngCore};
 use wasm_bindgen::UnwrapThrowExt;
 use web_sys::Event;
-use yew::{classes, html, Callback, Component, Context, Html, Properties};
+use yew::{classes, html, Callback, Component, Context, Html, NodeRef, Properties};
 
 #[cfg(feature = "testing")]
 use crate::testing::{ComponentRef, WithComponentRef};
@@ -84,6 +84,7 @@ pub struct NewPoll {
     // The `value` is `Some(_)` if there is a problem with parsing it; otherwise, the "Raw" tab
     // renders the JSON presentation of the config.
     spec: ValidatedValue<Option<String>>,
+    export_button_ref: NodeRef,
 }
 
 impl NewPoll {
@@ -469,9 +470,9 @@ impl NewPoll {
                 </div>
                 <div>
                     <button
+                        ref={self.export_button_ref.clone()}
                         type="button"
                         class="btn btn-outline-primary"
-                        title="Copy poll parameters to clipboard"
                         onclick={link.callback(move |_| NewPollMessage::ExportRequested)}>
                         { Icon::Export.view() }{ " Export" }
                     </button>
@@ -570,6 +571,7 @@ impl Component for NewPoll {
             poll_options: vec![ValidatedValue::unvalidated("Option #1".to_owned())],
             nonce,
             spec: ValidatedValue::default(),
+            export_button_ref: NodeRef::default(),
         }
     }
 
@@ -610,10 +612,12 @@ impl Component for NewPoll {
                 self.reset_spec();
             }
             NewPollMessage::ExportRequested => {
-                AppProperties::from_ctx(ctx).onexport.emit(ExportedData {
+                let data = ExportedData {
                     ty: ExportedDataType::PollSpec,
                     data: self.spec_string(),
-                });
+                };
+                let target = self.export_button_ref.cast().unwrap_throw();
+                AppProperties::from_ctx(ctx).onexport.emit((data, target));
                 return false;
             }
 

@@ -2,7 +2,7 @@
 
 use wasm_bindgen::UnwrapThrowExt;
 use web_sys::Event;
-use yew::{classes, html, Component, Context, Html};
+use yew::{classes, html, Component, Context, Html, NodeRef};
 use yew_router::prelude::*;
 
 use crate::{
@@ -20,7 +20,7 @@ use crate::{
 #[derive(Debug)]
 pub enum TallyingMessage {
     ShareSet(String),
-    ExportRequested(usize),
+    ExportRequested(usize, NodeRef),
     SecretUpdated,
     RollbackRequested,
     Rollback,
@@ -182,13 +182,16 @@ impl Tallying {
         }
 
         let link = ctx.link();
+        let export_button_ref = NodeRef::default();
         card.with_timestamp(share.submitted_at)
             .with_button(html! {
                 <button
+                    ref={export_button_ref.clone()}
                     type="button"
                     class="btn btn-sm btn-secondary"
-                    title="Copy share to clipboard"
-                    onclick={link.callback(move |_| TallyingMessage::ExportRequested(idx))}>
+                    onclick={link.callback(move |_| {
+                        TallyingMessage::ExportRequested(idx, export_button_ref.clone())
+                    })}>
                     { Icon::Export.view() }{ " Export" }
                 </button>
             })
@@ -303,14 +306,16 @@ impl Component for Tallying {
             TallyingMessage::ShareSet(share) => {
                 self.set_share(share);
             }
-            TallyingMessage::ExportRequested(idx) => {
+            TallyingMessage::ExportRequested(idx, target) => {
                 if let Some(share) = self.share(idx) {
                     let share = serde_json::to_string_pretty(share)
                         .expect_throw("failed serializing `TallierShare`");
-                    AppProperties::from_ctx(ctx).onexport.emit(ExportedData {
+                    let data = ExportedData {
                         ty: ExportedDataType::TallierShare,
                         data: share,
-                    });
+                    };
+                    let target = target.cast().unwrap_throw();
+                    AppProperties::from_ctx(ctx).onexport.emit((data, target));
                 }
                 return false;
             }

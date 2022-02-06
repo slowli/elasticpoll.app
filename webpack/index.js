@@ -8,6 +8,7 @@ import './icons/bootstrap-icons.scss';
 import 'bootstrap/js/dist/collapse';
 import Modal from 'bootstrap/js/dist/modal';
 import 'bootstrap/js/dist/tab';
+import Tooltip from 'bootstrap/js/dist/tooltip';
 import copyTextToClipboard from 'copy-text-to-clipboard';
 
 import { openBox, sealBox } from './crypto';
@@ -16,8 +17,16 @@ const SERVICE_WORKER_URL = '/service-worker.js';
 const CACHE_KEY = 'secret_seed';
 const PING_INTERVAL = 10000;
 
-function onValueExported({ data }) {
+function onValueExported({ data }, target) {
   copyTextToClipboard(data);
+
+  target.removeAttribute('title');
+  const tooltip = Tooltip.getOrCreateInstance(target, {
+    title: 'Copied to clipboard!',
+    trigger: 'manual',
+  });
+  tooltip.show();
+  setTimeout(() => tooltip.hide(), 3000);
 }
 
 async function postMessageAsync(controller, message) {

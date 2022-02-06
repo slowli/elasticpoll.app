@@ -1,6 +1,7 @@
 //! Application (the root component).
 
 use wasm_bindgen::UnwrapThrowExt;
+use web_sys::Element;
 use yew::{html, html::Scope, Callback, Component, Context, ContextProvider, Html, Properties};
 use yew_router::prelude::*;
 
@@ -23,7 +24,7 @@ pub struct AppProperties {
     pub modals: Rc<dyn ManageModals>,
     /// Callback when a value gets exported.
     #[prop_or_default]
-    pub onexport: Callback<ExportedData>,
+    pub onexport: Callback<(ExportedData, Element)>,
 }
 
 impl PartialEq for AppProperties {

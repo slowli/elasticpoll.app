@@ -31,11 +31,7 @@ fn mangle_bytes(
     pointer: &'static str,
     bits_to_mangle: impl Iterator<Item = usize>,
 ) -> impl Iterator<Item = serde_json::Value> {
-    let value_str = json
-        .pointer(pointer)
-        .expect_throw("!!!")
-        .as_str()
-        .unwrap_throw();
+    let value_str = json.pointer(pointer).unwrap_throw().as_str().unwrap_throw();
     let mut value = [0_u8; 32];
     Base64UrlUnpadded::decode(value_str, &mut value).unwrap_throw();
 

@@ -2,7 +2,7 @@
 
 use wasm_bindgen::UnwrapThrowExt;
 use web_sys::Event;
-use yew::{classes, html, Component, Context, Html};
+use yew::{classes, html, Component, Context, Html, NodeRef};
 use yew_router::prelude::*;
 
 use std::{cmp::Ordering, collections::HashSet};
@@ -18,7 +18,7 @@ use crate::{
 #[derive(Debug)]
 pub enum HomeMessage {
     PollSet(String),
-    ExportRequested(PollId),
+    ExportRequested(PollId, NodeRef),
     Removal(RemovalMessage<PollId>),
 }
 
@@ -108,7 +108,6 @@ impl Home {
         let progress_percent = (poll_stage.index() as f64 / PollStage::MAX_INDEX as f64) * 100.0;
         let is_pending_removal = self.pending_removals.contains(&id);
 
-        let link = ctx.link();
         let mut card = Card::new(
             html! { &state.spec().title },
             html! {
@@ -127,17 +126,20 @@ impl Home {
                 </>
             },
         );
+
+        let link = ctx.link();
         if is_pending_removal {
             card = card.confirm_removal(id, link);
         }
-
         let continue_text = if matches!(poll_stage, PollStage::Finished) {
             "Results"
         } else {
             "Continue"
         };
+
         let mut card = card.with_timestamp(state.created_at);
         if !is_pending_removal {
+            let export_button_ref = NodeRef::default();
             card = card
                 .with_button(html! {
                     <Link<Route>
@@ -148,10 +150,12 @@ impl Home {
                 })
                 .with_button(html! {
                     <button
+                        ref={export_button_ref.clone()}
                         type="button"
                         class="btn btn-sm btn-secondary me-2"
-                        title="Copy poll state to clipboard"
-                        onclick={link.callback(move |_| HomeMessage::ExportRequested(id))}>
+                        onclick={link.callback(move |_| {
+                            HomeMessage::ExportRequested(id, export_button_ref.clone())
+                        })}>
                         { Icon::Export.view() }{ " Export" }
                     </button>
                 })
@@ -268,14 +272,16 @@ impl Component for Home {
                 self.pending_removals.remove(&id);
             }
 
-            HomeMessage::ExportRequested(id) => {
+            HomeMessage::ExportRequested(id, target) => {
                 if let Some(poll) = self.poll_manager.poll(&id) {
                     let data = serde_json::to_string_pretty(&poll.export())
                         .expect_throw("Cannot serialize `ExportedPoll`");
-                    AppProperties::from_ctx(ctx).onexport.emit(ExportedData {
+                    let data = ExportedData {
                         ty: ExportedDataType::PollState,
                         data,
-                    });
+                    };
+                    let target = target.cast().unwrap_throw();
+                    AppProperties::from_ctx(ctx).onexport.emit((data, target));
                     return false;
                 }
             }

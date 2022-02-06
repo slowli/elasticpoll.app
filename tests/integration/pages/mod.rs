@@ -104,7 +104,7 @@ where
             app_props: AppProperties {
                 secrets: Rc::new(SecretManager::new(mock_crypto)),
                 modals: mock_modals,
-                onexport: Callback::from(move |data| export_calls_.push_call(data)),
+                onexport: Callback::from(move |(data, _)| export_calls_.push_call(data)),
             },
             export_calls,
             _component: PhantomData,

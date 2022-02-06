@@ -3,6 +3,7 @@
 use js_sys::Promise;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::{prelude::*, UnwrapThrowExt};
+use web_sys::Element;
 use yew::Callback;
 
 use std::{fmt, rc::Rc};
@@ -74,7 +75,7 @@ extern "C" {
     fn hide_modal(this: &JsAppProperties, element_id: &str);
 
     #[wasm_bindgen(structural, method)]
-    fn onexport(this: &JsAppProperties, data: JsValue);
+    fn onexport(this: &JsAppProperties, data: JsValue, target: Element);
 
     #[wasm_bindgen(structural, method, js_name = getCachedBox)]
     fn cached_box(this: &JsAppProperties) -> Promise;
@@ -116,10 +117,10 @@ impl From<JsAppProperties> for AppProperties {
         let onexport_props = Rc::clone(&props);
 
         Self {
-            onexport: Callback::from(move |data: ExportedData| {
+            onexport: Callback::from(move |(data, target)| {
                 let data =
                     JsValue::from_serde(&data).expect_throw("cannot serialize `ExportedData`");
-                onexport_props.onexport(data);
+                onexport_props.onexport(data, target);
             }),
             modals: Rc::clone(&props) as Rc<dyn ManageModals>,
             secrets: Rc::new(SecretManager::new(props)),
