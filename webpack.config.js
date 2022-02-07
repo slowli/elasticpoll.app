@@ -1,5 +1,6 @@
 const { mkdir } = require('fs');
 const path = require('path');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const WasmPackPlugin = require('@wasm-tool/wasm-pack-plugin');
@@ -76,6 +77,12 @@ const config = {
     },
   },
   plugins: [
+    new CopyWebpackPlugin({
+      patterns: [{
+        from: './webpack/favicon',
+        to: '_assets/css/[name][ext]',
+      }],
+    }),
     new MiniCssExtractPlugin({
       filename: '_assets/css/[name].css',
     }),

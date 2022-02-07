@@ -1,12 +1,15 @@
 # Elastic Poll
 
 [![Build status][ci-image]][ci-url]
-[![License: Apache-2.0][license-image]][license-url] 
+[![Live website][website-image]][website-url]
+[![License: Apache-2.0][license-image]][license-url]
 
 [ci-image]: https://github.com/slowli/elasticpoll.app/actions/workflows/ci.yml/badge.svg
 [ci-url]: https://github.com/slowli/elasticpoll.app/actions/workflows/ci.yml
+[website-image]: https://img.shields.io/badge/website-live-blue.svg
+[website-url]: https://elasticpoll.app/
 [license-image]: https://img.shields.io/github/license/slowli/elasticpoll.app.svg
-[license-url]: https://github.com/slowli/elasticpoll.app/blob/main/LICENSE 
+[license-url]: https://github.com/slowli/elasticpoll.app/blob/main/LICENSE
 
 Serverless web app that allows organizing single-choice and multi-choice polls 
 that combine privacy and universal verifiability with the help of 

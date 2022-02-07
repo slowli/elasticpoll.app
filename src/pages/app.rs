@@ -1,6 +1,7 @@
 //! Application (the root component).
 
 use wasm_bindgen::UnwrapThrowExt;
+use web_sys::Element;
 use yew::{html, html::Scope, Callback, Component, Context, ContextProvider, Html, Properties};
 use yew_router::prelude::*;
 
@@ -23,7 +24,7 @@ pub struct AppProperties {
     pub modals: Rc<dyn ManageModals>,
     /// Callback when a value gets exported.
     #[prop_or_default]
-    pub onexport: Callback<ExportedData>,
+    pub onexport: Callback<(ExportedData, Element)>,
 }
 
 impl PartialEq for AppProperties {
@@ -80,13 +81,18 @@ impl App {
             <footer class="page-footer small">
                 <div class="row">
                     <div class="col-md-9">
+                        <img src="/_assets/css/favicon.svg"
+                            alt="Site logo"
+                            class="float-start me-3 mb-2"
+                            width="48"
+                            height="48" />
                         <p class="mb-2">
                             { "© 2022 Alex Ostrovski. Licensed under " }
                             <a rel="license" href="https://www.apache.org/licenses/LICENSE-2.0">
                                 { "Apache 2.0" }
                             </a>
                         </p>
-                        <p>
+                        <p class="text-muted">
                             { "This site is open-source! " }
                             <a href="https://github.com/slowli/elasticpoll.app">
                                 { "Contribute on GitHub" }

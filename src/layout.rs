@@ -2,8 +2,8 @@
 
 use js_sys::Date;
 use wasm_bindgen::UnwrapThrowExt;
-use web_sys::Event;
-use yew::{classes, html, html::Scope, Callback, Component, Html, MouseEvent};
+use web_sys::{Element, Event};
+use yew::{classes, html, html::Scope, Callback, Component, Html, MouseEvent, NodeRef};
 
 use crate::{
     js::{ExportedData, ExportedDataType},
@@ -199,15 +199,18 @@ impl Icon {
 type OptionChangeCallback = Callback<(usize, Event)>;
 
 impl PollSpec {
-    pub fn view_summary_card(&self, onexport: &Callback<ExportedData>) -> Html {
+    pub fn view_summary_card(&self, onexport: &Callback<(ExportedData, Element)>) -> Html {
         let exported_data = ExportedData {
             ty: ExportedDataType::PollSpec,
             data: serde_json::to_string_pretty(self).expect_throw("cannot serialize `PollSpec`"),
         };
+        let export_button_ref = NodeRef::default();
+        let export_button_ref_ = export_button_ref.clone();
         let onexport = onexport.reform(move |evt: MouseEvent| {
             evt.stop_propagation();
             evt.prevent_default();
-            exported_data.clone()
+            let target = export_button_ref_.cast::<Element>().unwrap_throw();
+            (exported_data.clone(), target)
         });
 
         html! {
@@ -231,9 +234,9 @@ impl PollSpec {
 
                         <div class="accordion-body">
                             <button
+                                ref={export_button_ref}
                                 type="button"
                                 class="btn btn-sm btn-secondary ms-3 mb-2 float-end"
-                                title="Copy poll parameters to clipboard"
                                 onclick={onexport}>
                                 { Icon::Export.view() }{ " Export" }
                             </button>

@@ -2,7 +2,7 @@
 
 use wasm_bindgen::UnwrapThrowExt;
 use web_sys::{Event, HtmlInputElement};
-use yew::{classes, html, Component, Context, Html};
+use yew::{classes, html, Component, Context, Html, NodeRef};
 use yew_router::prelude::*;
 
 use crate::{
@@ -22,7 +22,7 @@ pub enum VotingMessage {
     OptionSelected(usize, bool),
     VoteSet(String),
     OurVoteAdded,
-    ExportRequested(usize),
+    ExportRequested(usize, NodeRef),
     SecretUpdated,
     Done,
     RollbackRequested,
@@ -212,13 +212,16 @@ impl Voting {
         }
 
         let link = ctx.link();
+        let export_button_ref = NodeRef::default();
         card.with_timestamp(vote.submitted_at)
             .with_button(html! {
                 <button
+                    ref={export_button_ref.clone()}
                     type="button"
                     class="btn btn-sm btn-secondary"
-                    title="Copy vote to clipboard"
-                    onclick={link.callback(move |_| VotingMessage::ExportRequested(idx))}>
+                    onclick={link.callback(move |_| {
+                        VotingMessage::ExportRequested(idx, export_button_ref.clone())
+                    })}>
                     { Icon::Export.view() }{ " Export" }
                 </button>
             })
@@ -326,14 +329,16 @@ impl Component for Voting {
             VotingMessage::OurVoteAdded => {
                 self.insert_our_vote(ctx);
             }
-            VotingMessage::ExportRequested(idx) => {
+            VotingMessage::ExportRequested(idx, target) => {
                 if let Some(vote) = self.vote(idx) {
                     let vote = serde_json::to_string_pretty(vote)
                         .expect_throw("failed serializing `Vote`");
-                    AppProperties::from_ctx(ctx).onexport.emit(ExportedData {
+                    let data = ExportedData {
                         ty: ExportedDataType::Vote,
                         data: vote,
-                    });
+                    };
+                    let target = target.cast().unwrap_throw();
+                    AppProperties::from_ctx(ctx).onexport.emit((data, target));
                 }
                 return false;
             }
