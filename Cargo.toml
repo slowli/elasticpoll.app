@@ -5,7 +5,7 @@ authors = ["Alex Ostrovski <ostrovski.alex@gmail.com>"]
 edition = "2021"
 license = "Apache-2.0"
 description = "Cryptographically secure polling web app"
-repository = "https://github.com/slowli/elastic-elgamal-site"
+repository = "https://github.com/slowli/elasticpoll.app"
 publish = false
 
 [package.metadata.wasm-pack.profile.release]
