@@ -30,7 +30,7 @@ and the *About* page for more details on technologies used.
 ## ⚠ Warnings
 
 Cryptography behind the app was not independently audited, in particular
-against side-channel (e.g., timing)k attacks.
+against side-channel (e.g., timing) attacks.
 
 The app entirely lacks a server part; the poll state is stored within the browser.
 It is participants’ responsibility to exchange data via a reliable broadcast channel,
