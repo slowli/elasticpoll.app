@@ -50,7 +50,7 @@
     "rimraf": "^3.0.2",
     "sass": "^1.49.11",
     "sass-loader": "^12.6.0",
-    "stylelint": "^14.6.1",
+    "stylelint": "^14.8.1",
     "stylelint-config-recommended-scss": "^6.0.0",
     "wasm-pack": "^0.10.1",
     "webpack": "^5.70.0",
