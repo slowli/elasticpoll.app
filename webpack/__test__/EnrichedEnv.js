@@ -1,6 +1,6 @@
 const { webcrypto } = require('crypto');
 const { TextEncoder, TextDecoder } = require('util');
-const JsdomEnv = require('jest-environment-jsdom');
+const { default: JsdomEnv } = require('jest-environment-jsdom');
 
 // Adds `TextEncoder`, `TextDecoder` and `crypto` globals into the test environment.
 module.exports = class EnrichedEnv extends JsdomEnv {
