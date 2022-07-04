@@ -43,9 +43,7 @@ git = "https://github.com/slowli/secret-tree.git"
 rev = "06a15b15d14b1edad189e61840ca9f8c008848c5"
 
 [dependencies.elastic-elgamal]
-version = "0.1.0"
-git = "https://github.com/slowli/elastic-elgamal.git"
-rev = "45d08207cb87eadfed534504c578e03eb42fe4e5"
+version = "0.2.0"
 features = ["serde"]
 
 [dev-dependencies]
