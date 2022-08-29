@@ -21,7 +21,7 @@ pub use self::{
 use crate::poll::{PollId, PollStage, PollState};
 
 /// Application routes.
-#[derive(Debug, Clone, PartialEq, Routable)]
+#[derive(Debug, Clone, PartialEq, Eq, Routable)]
 pub enum Route {
     #[at("/")]
     Home,

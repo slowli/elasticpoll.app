@@ -26,7 +26,7 @@ pub type PublicKey = elastic_elgamal::PublicKey<Group>;
 pub type PublicKeyBytes = [u8; 32];
 pub type Keypair = elastic_elgamal::Keypair<Group>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PollType {
     SingleChoice,
@@ -106,7 +106,7 @@ impl PollId {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PollStage {
     Participants { participants: usize },
     Voting { votes: usize, participants: usize },
