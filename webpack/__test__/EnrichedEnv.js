@@ -12,6 +12,8 @@ module.exports = class EnrichedEnv extends JsdomEnv {
     }
     if (this.global.crypto === undefined) {
       this.global.crypto = webcrypto;
+    } else if (this.global.crypto.subtle === undefined) {
+      this.global.crypto.subtle = webcrypto.subtle;
     }
   }
 };
