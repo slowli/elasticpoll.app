@@ -28,7 +28,7 @@
   },
   "homepage": "https://github.com/slowli/elasticpoll.app#readme",
   "devDependencies": {
-    "@babel/core": "^7.18.2",
+    "@babel/core": "^7.19.0",
     "@babel/plugin-transform-runtime": "^7.18.2",
     "@babel/preset-env": "^7.18.2",
     "@wasm-tool/wasm-pack-plugin": "^1.6.0",
