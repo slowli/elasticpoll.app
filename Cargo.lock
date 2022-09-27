@@ -647,8 +647,9 @@ dependencies = [
 
 [[package]]
 name = "secret-tree"
-version = "0.4.1"
-source = "git+https://github.com/slowli/secret-tree.git?rev=06a15b15d14b1edad189e61840ca9f8c008848c5#06a15b15d14b1edad189e61840ca9f8c008848c5"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "189a90fff102d7e4c73fc172ed0c56e1100ffeb6b25de4d91f9f7fa4cc2b7681"
 dependencies = [
  "blake2",
  "rand",
