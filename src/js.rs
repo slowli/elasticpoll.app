@@ -118,8 +118,8 @@ impl From<JsAppProperties> for AppProperties {
 
         Self {
             onexport: Callback::from(move |(data, target)| {
-                let data =
-                    JsValue::from_serde(&data).expect_throw("cannot serialize `ExportedData`");
+                let data = serde_wasm_bindgen::to_value(&data)
+                    .expect_throw("cannot serialize `ExportedData`");
                 onexport_props.onexport(data, target);
             }),
             modals: Rc::clone(&props) as Rc<dyn ManageModals>,

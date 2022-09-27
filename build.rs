@@ -1,7 +1,6 @@
 use regex::Regex;
 use serde::Deserialize;
 
-use std::fmt::Formatter;
 use std::{
     env,
     error::Error as StdError,
@@ -56,7 +55,7 @@ struct GitInfo {
 }
 
 impl fmt::Display for GitInfo {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
             "GitInfo {{ commit_hash: {commit_hash:?} }}",
@@ -70,7 +69,7 @@ fn record_git_info() -> Result<(), Box<dyn StdError>> {
         .args(["status", "--porcelain=v2", "--branch"])
         .output()?;
 
-    let commit_hash_regex = Regex::new(r"\b(?P<hash>[0-9a-f]{40})$")?;
+    let commit_hash_regex = Regex::new(r"\b(?P<hash>[\da-f]{40})$")?;
     let mut commit_hash = None;
     for line in output.stdout.split(|&ch| ch == b'\n') {
         if line.starts_with(b"# branch.oid") {
@@ -96,7 +95,7 @@ fn record_git_info() -> Result<(), Box<dyn StdError>> {
 }
 
 fn main() -> Result<(), Box<dyn StdError>> {
-    let git_regex = Regex::new(r"^git.*github\.com/(?P<repo>.*)\?.*#(?P<rev>[0-9a-f]{40})$")?;
+    let git_regex = Regex::new(r"^git.*github\.com/(?P<repo>.*)\?.*#(?P<rev>[\da-f]{40})$")?;
 
     let package_lock = fs::read_to_string("Cargo.lock")?;
     let lockfile: Lockfile = toml::from_str(&package_lock)?;
