@@ -8,7 +8,8 @@
     clippy::must_use_candidate,
     clippy::missing_panics_doc,
     clippy::missing_errors_doc,
-    clippy::unused_unit // emitted by `wasm_bindgen` macro
+    clippy::let_unit_value, // emitted by `yew::html!` proc macro
+    clippy::unused_unit // emitted by `wasm_bindgen` proc macro
 )]
 
 use wasm_bindgen::{prelude::*, UnwrapThrowExt};
