@@ -390,7 +390,7 @@ impl PollState {
         }
     }
 
-    pub fn import(exported_poll: ExportedPoll) -> Result<(PollId, Self), PollValidationError> {
+    pub fn import(exported_poll: ExportedPoll) -> Result<(PollId, Self), Box<PollValidationError>> {
         let poll_id = PollId::for_spec(&exported_poll.spec);
         let mut poll = PollState::new(exported_poll.spec);
 
@@ -404,7 +404,7 @@ impl PollState {
 
         if exported_poll.votes.is_empty() {
             if !exported_poll.tallier_shares.is_empty() {
-                return Err(PollValidationError::UnexpectedShares);
+                return Err(Box::new(PollValidationError::UnexpectedShares));
             }
             return Ok((poll_id, poll));
         }
