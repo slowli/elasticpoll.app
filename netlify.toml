@@ -3,8 +3,8 @@ publish = "dist/"
 command = "bash ./build.sh"
 
 [build.environment]
-NODE_VERSION = "16.13.0"
-RUST_VERSION = "1.63.0"
+NODE_VERSION = "18.12.0"
+RUST_VERSION = "1.65.0"
 
 # Rewrite rule to enable history-based navigation
 [[redirects]]
