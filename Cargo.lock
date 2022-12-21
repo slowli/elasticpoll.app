@@ -206,6 +206,7 @@ dependencies = [
  "base64ct",
  "elastic-elgamal",
  "getrandom",
+ "gloo-timers",
  "js-sys",
  "merlin",
  "rand",

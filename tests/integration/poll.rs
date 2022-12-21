@@ -462,7 +462,7 @@ fn tallier_share_with_invalid_dh_element() {
             .unwrap_err();
         assert_matches!(err, TallierShareError::InvalidShare { index: 0, .. });
     }
-    assert!(count > 20, "Too few valid mangled elements: {}", count);
+    assert!(count > 20, "Too few valid mangled elements: {count}");
 }
 
 #[wasm_bindgen_test]

@@ -18,30 +18,33 @@ fn input_col(root: &Element, input_selector: &str) -> Element {
 }
 
 #[wasm_bindgen_test]
-fn error_on_empty_title() {
-    let rig = TestRig::<NewPoll>::new(NewPollProperties::default());
+async fn error_on_empty_title() {
+    let rig = TestRig::<NewPoll>::new(NewPollProperties::default()).await;
     let title_input_parent = input_col(&rig.root_element, "#title");
     assert_no_child(&title_input_parent, ".invalid-feedback");
 
-    rig.send_message(NewPollMessage::TitleSet("New poll".to_owned()));
+    rig.send_message(NewPollMessage::TitleSet("New poll".to_owned()))
+        .await;
     let title_input_parent = input_col(&rig.root_element, "#title");
     assert_no_child(&title_input_parent, ".invalid-feedback");
 
-    rig.send_message(NewPollMessage::TitleSet(String::new()));
+    rig.send_message(NewPollMessage::TitleSet(String::new()))
+        .await;
     let title_input_parent = input_col(&rig.root_element, "#title");
     let feedback = extract_feedback(&title_input_parent);
     assert!(feedback.contains("cannot be empty"), "{}", feedback);
 }
 
 #[wasm_bindgen_test]
-fn error_on_duplicate_option() {
-    let rig = TestRig::<NewPoll>::new(NewPollProperties::default());
+async fn error_on_duplicate_option() {
+    let rig = TestRig::<NewPoll>::new(NewPollProperties::default()).await;
     assert_no_child(&rig.root_element, ".invalid-feedback");
 
-    rig.send_message(NewPollMessage::OptionSet(0, "Option #2".to_owned()));
+    rig.send_message(NewPollMessage::OptionSet(0, "Option #2".to_owned()))
+        .await;
     assert_no_child(&rig.root_element, ".invalid-feedback");
 
-    rig.send_message(NewPollMessage::OptionAdded);
+    rig.send_message(NewPollMessage::OptionAdded).await;
     for option_id in ["#option-0", "#option-1"] {
         let option_col = input_col(&rig.root_element, option_id)
             .parent_element()
@@ -54,7 +57,7 @@ fn error_on_duplicate_option() {
         );
     }
 
-    rig.send_message(NewPollMessage::OptionRemoved(0));
+    rig.send_message(NewPollMessage::OptionRemoved(0)).await;
     assert_no_child(&rig.root_element, ".invalid-feedback");
 }
 
@@ -80,18 +83,18 @@ fn assert_option_controls(option_col: &Element, up_disabled: bool, down_disabled
 }
 
 #[wasm_bindgen_test]
-fn option_controls() {
-    let rig = TestRig::<NewPoll>::new(NewPollProperties::default());
+async fn option_controls() {
+    let rig = TestRig::<NewPoll>::new(NewPollProperties::default()).await;
     let option_col = input_col(&rig.root_element, "#option-0");
     assert_no_child(&option_col, "button");
 
-    rig.send_message(NewPollMessage::OptionAdded);
+    rig.send_message(NewPollMessage::OptionAdded).await;
     let option_col = input_col(&rig.root_element, "#option-0");
     assert_option_controls(&option_col, true, false);
     let option_col = input_col(&rig.root_element, "#option-1");
     assert_option_controls(&option_col, false, true);
 
-    rig.send_message(NewPollMessage::OptionAdded);
+    rig.send_message(NewPollMessage::OptionAdded).await;
     let option_col = input_col(&rig.root_element, "#option-0");
     assert_option_controls(&option_col, true, false);
     let option_col = input_col(&rig.root_element, "#option-1");
@@ -99,8 +102,8 @@ fn option_controls() {
     let option_col = input_col(&rig.root_element, "#option-2");
     assert_option_controls(&option_col, false, true);
 
-    rig.send_message(NewPollMessage::OptionRemoved(0));
-    rig.send_message(NewPollMessage::OptionRemoved(1));
+    rig.send_message(NewPollMessage::OptionRemoved(0)).await;
+    rig.send_message(NewPollMessage::OptionRemoved(1)).await;
     let option_col = input_col(&rig.root_element, "#option-0");
     assert_no_child(&option_col, "button");
 }
@@ -114,9 +117,9 @@ fn extract_spec(rig: &TestRig<NewPoll>) -> PollSpec {
 }
 
 #[wasm_bindgen_test]
-fn exporting_a_poll() {
-    let rig = TestRig::<NewPoll>::new(NewPollProperties::default());
-    rig.send_message(NewPollMessage::ExportRequested);
+async fn exporting_a_poll() {
+    let rig = TestRig::<NewPoll>::new(NewPollProperties::default()).await;
+    rig.send_message(NewPollMessage::ExportRequested).await;
 
     let export = rig.export_calls().assert_called_once();
     assert_matches!(export.ty, ExportedDataType::PollSpec);
@@ -125,8 +128,8 @@ fn exporting_a_poll() {
 }
 
 #[wasm_bindgen_test]
-fn importing_a_poll() {
-    let rig = TestRig::<NewPoll>::new(NewPollProperties::default());
+async fn importing_a_poll() {
+    let rig = TestRig::<NewPoll>::new(NewPollProperties::default()).await;
     extract_spec(&rig);
     let spec_col = input_col(&rig.root_element, "#poll-spec");
     assert_no_child(&spec_col, ".invalid-feedback");
@@ -138,7 +141,8 @@ fn importing_a_poll() {
         "nonce": 1498698199,
         "options": ["Apple", "Banana"]
     }"#;
-    rig.send_message(NewPollMessage::SpecSet(spec_json.to_owned()));
+    rig.send_message(NewPollMessage::SpecSet(spec_json.to_owned()))
+        .await;
 
     let title = select_single_element(&rig.root_element, "#title")
         .dyn_into::<HtmlInputElement>()
@@ -161,7 +165,8 @@ fn importing_a_poll() {
     assert_no_child(&spec_col, ".invalid-feedback");
 
     let invalid_spec_json = &spec_json[..30];
-    rig.send_message(NewPollMessage::SpecSet(invalid_spec_json.to_owned()));
+    rig.send_message(NewPollMessage::SpecSet(invalid_spec_json.to_owned()))
+        .await;
 
     let spec_json = select_single_element(&rig.root_element, "#poll-spec")
         .dyn_into::<HtmlTextAreaElement>()
@@ -176,7 +181,7 @@ fn importing_a_poll() {
         feedback
     );
 
-    rig.send_message(NewPollMessage::SpecReset);
+    rig.send_message(NewPollMessage::SpecReset).await;
     let spec = extract_spec(&rig);
     assert_eq!(spec.description, "Huh?");
     let spec_col = input_col(&rig.root_element, "#poll-spec");
