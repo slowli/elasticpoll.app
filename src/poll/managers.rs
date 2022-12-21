@@ -32,7 +32,7 @@ impl PollManager {
         let local_storage = local_storage();
         let poll = PollState::new(spec);
         let poll = serde_json::to_string(&poll).expect_throw("cannot serialize `PollState`");
-        let key = format!("{}::poll::{}", self.storage_key_prefix, id);
+        let key = format!("{}::poll::{id}", self.storage_key_prefix);
         local_storage
             .set_item(&key, &poll)
             .expect_throw("failed saving poll");
@@ -76,7 +76,7 @@ impl PollManager {
     /// Gets the poll state by ID.
     pub fn poll(&self, id: &PollId) -> Option<PollState> {
         let local_storage = local_storage();
-        let key = format!("{}::poll::{}", self.storage_key_prefix, id);
+        let key = format!("{}::poll::{id}", self.storage_key_prefix);
         let state_string = local_storage
             .get_item(&key)
             .expect_throw("failed getting poll state")?;
@@ -86,7 +86,7 @@ impl PollManager {
     // TODO: CAS semantics?
     pub fn update_poll(&self, id: &PollId, poll: &PollState) {
         let local_storage = local_storage();
-        let key = format!("{}::poll::{}", self.storage_key_prefix, id);
+        let key = format!("{}::poll::{id}", self.storage_key_prefix);
         let poll = serde_json::to_string(&poll).expect_throw("cannot serialize `PollState`");
         local_storage
             .set_item(&key, &poll)
@@ -95,7 +95,7 @@ impl PollManager {
 
     pub fn remove_poll(&self, id: &PollId) {
         let local_storage = local_storage();
-        let key = format!("{}::poll::{}", self.storage_key_prefix, id);
+        let key = format!("{}::poll::{id}", self.storage_key_prefix);
         local_storage
             .remove_item(&key)
             .expect_throw("cannot remove `PollState` from local storage");

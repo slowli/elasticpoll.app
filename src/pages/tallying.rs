@@ -54,7 +54,7 @@ impl Tallying {
             Err(err) => {
                 self.new_share = ValidatedValue {
                     value: share,
-                    error_message: Some(format!("Error parsing share: {}", err)),
+                    error_message: Some(format!("Error parsing share: {err}")),
                 };
                 return;
             }
@@ -64,7 +64,7 @@ impl Tallying {
             if let Err(err) = state.insert_tallier_share(&self.poll_id, parsed_share) {
                 self.new_share = ValidatedValue {
                     value: share,
-                    error_message: Some(format!("Error verifying share: {}", err)),
+                    error_message: Some(format!("Error verifying share: {err}")),
                 };
                 return;
             }
@@ -258,12 +258,12 @@ impl Tallying {
             html! { <strong>{ option }</strong> },
             html! {
                 <>
-                    <p class="mb-1">{ format!("{} votes ({:.0}%)", votes, progress_percent) }</p>
+                    <p class="mb-1">{ format!("{votes} votes ({progress_percent:.0}%)") }</p>
                     <div class="progress">
                         <div
                             class="progress-bar"
                             role="progressbar"
-                            style={format!("width: {:.2}%", progress_percent)}
+                            style={format!("width: {progress_percent:.2}%")}
                             aria-valuenow={progress_percent.to_string()}
                             aria-valuemin="0"
                             aria-valuemax="100">
@@ -386,8 +386,8 @@ impl Component for Tallying {
                 </>
             }
         } else {
-            let history = ctx.link().history().unwrap_throw();
-            history.replace(Route::NotFound);
+            let navigator = ctx.link().navigator().unwrap_throw();
+            navigator.replace(&Route::NotFound);
             html! {}
         }
     }

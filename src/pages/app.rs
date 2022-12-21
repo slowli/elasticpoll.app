@@ -219,21 +219,21 @@ impl Component for Main {
     }
 
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
-        let history = ctx.link().history().expect_throw("cannot get history");
+        let navigator = ctx.link().navigator().expect_throw("cannot get history");
         match msg {
             AppMessage::PollCreated(spec) => {
                 let id = self.poll_manager.create_poll(spec);
-                history.replace(Route::PollParticipants { id });
+                navigator.replace(&Route::PollParticipants { id });
             }
             AppMessage::ParticipantsFinalized(id, mut state) => {
                 state.finalize_participants();
                 self.poll_manager.update_poll(&id, &state);
-                history.push(Route::Voting { id });
+                navigator.push(&Route::Voting { id });
             }
             AppMessage::RolledBackToParticipants(id, mut state) => {
                 state.rollback_to_participants_selection();
                 self.poll_manager.update_poll(&id, &state);
-                history.push(Route::PollParticipants { id });
+                navigator.push(&Route::PollParticipants { id });
             }
             AppMessage::VotesFinalized(id, mut state) => {
                 state.finalize_votes();
@@ -245,12 +245,12 @@ impl Component for Main {
                     }
                 }
                 self.poll_manager.update_poll(&id, &state);
-                history.push(Route::Tallying { id });
+                navigator.push(&Route::Tallying { id });
             }
             AppMessage::RolledBackToVoting(id, mut state) => {
                 state.rollback_to_voting();
                 self.poll_manager.update_poll(&id, &state);
-                history.push(Route::Voting { id });
+                navigator.push(&Route::Voting { id });
             }
         }
         true
@@ -258,7 +258,7 @@ impl Component for Main {
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         let link = ctx.link().clone();
-        let render = Switch::render(move |route| Self::render_route(route, &link));
+        let render = move |route| Self::render_route(&route, &link);
 
         html! {
             <ContextProvider<AppProperties> context={ctx.props().clone()}>

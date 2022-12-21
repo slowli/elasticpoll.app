@@ -45,7 +45,7 @@ where
     type Value = Vec<T>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "at least {} and at most {} items", MIN, MAX)
+        write!(formatter, "at least {MIN} and at most {MAX} items")
     }
 
     fn visit_seq<S>(self, mut access: S) -> Result<Self::Value, S::Error>

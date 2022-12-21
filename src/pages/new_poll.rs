@@ -201,7 +201,7 @@ impl NewPoll {
     }
 
     fn view_poll_option(&self, idx: usize, option: &ValidatedValue, ctx: &Context<Self>) -> Html {
-        let control_id = format!("option-{}", idx);
+        let control_id = format!("option-{idx}");
         let mut control_classes = classes!["form-control"];
         if option.error_message.is_some() {
             control_classes.push("is-invalid");
@@ -519,7 +519,7 @@ impl NewPoll {
             Err(err) => {
                 self.spec = ValidatedValue {
                     value: Some(spec_string),
-                    error_message: Some(format!("Error deserializing spec: {}", err)),
+                    error_message: Some(format!("Error deserializing spec: {err}")),
                 };
                 return;
             }

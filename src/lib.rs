@@ -13,6 +13,7 @@
 )]
 
 use wasm_bindgen::{prelude::*, UnwrapThrowExt};
+use yew::Renderer;
 
 mod components;
 pub mod js;
@@ -35,5 +36,5 @@ pub fn run_app(props: JsAppProperties) {
         .expect_throw("cannot get app root node")
         .expect_throw("cannot unwrap body node");
 
-    yew::start_app_with_props_in_element::<App>(element, props.into());
+    Renderer::<App>::with_root_and_props(element, props.into()).render();
 }

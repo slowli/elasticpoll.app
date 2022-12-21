@@ -1,6 +1,6 @@
 //! Rollback modal.
 
-use web_sys::FocusEvent;
+use web_sys::SubmitEvent;
 use yew::{html, Callback, Component, Context, Html, Properties};
 
 use crate::{layout::Icon, pages::AppProperties};
@@ -32,7 +32,7 @@ impl Rollback {
         let link = ctx.link();
 
         html! {
-            <form onsubmit={link.callback(move |evt: FocusEvent| {
+            <form onsubmit={link.callback(move |evt: SubmitEvent| {
                 evt.prevent_default();
                 RollbackMessage::Confirmed
             })}>

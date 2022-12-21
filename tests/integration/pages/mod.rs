@@ -4,7 +4,7 @@ use base64ct::{Base64UrlUnpadded, Encoding};
 use js_sys::{Error, Promise, Uint8Array};
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::Element;
-use yew::{html, Callback, Component, Context, ContextProvider, Html};
+use yew::{html, Callback, Component, Context, ContextProvider, Html, Renderer};
 
 use std::{cell::RefCell, marker::PhantomData, rc::Rc};
 
@@ -152,7 +152,7 @@ where
 
         let component = ComponentRef::<C>::default();
         props.set_component_ref(component.clone());
-        let app_handle = yew::start_app_with_props_in_element::<Wrapper<C>>(div.clone(), props);
+        let app_handle = Renderer::<Wrapper<C>>::with_root_and_props(div.clone(), props).render();
         let export_calls = &app_handle
             .get_component()
             .expect_throw("cannot get wrapper")

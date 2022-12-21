@@ -50,7 +50,7 @@ impl Home {
             Err(err) => {
                 self.new_poll = ValidatedValue {
                     value: poll,
-                    error_message: Some(format!("Error parsing poll: {}", err)),
+                    error_message: Some(format!("Error parsing poll: {err}")),
                 };
                 return;
             }
@@ -61,7 +61,7 @@ impl Home {
             Err(err) => {
                 self.new_poll = ValidatedValue {
                     value: poll,
-                    error_message: Some(format!("Error validating poll: {}", err)),
+                    error_message: Some(format!("Error validating poll: {err}")),
                 };
                 return;
             }
@@ -117,7 +117,7 @@ impl Home {
                         <div
                             class="progress-bar"
                             role="progressbar"
-                            style={format!("width: {:.2}%", progress_percent)}
+                            style={format!("width: {progress_percent:.2}%")}
                             aria-valuenow={poll_stage.index().to_string()}
                             aria-valuemin="0"
                             aria-valuemax={PollStage::MAX_INDEX.to_string()}>
@@ -178,7 +178,7 @@ impl Home {
                 html! {
                     <>
                         <strong>{ "Adding participants:" }</strong>
-                        { format!(" {}", participants) }
+                        { format!(" {participants}") }
                     </>
                 }
             }
@@ -189,7 +189,7 @@ impl Home {
                 html! {
                     <>
                         <strong>{ "Voting:" }</strong>
-                        { format!(" {} votes / {} eligible voters", votes, participants) }
+                        { format!(" {votes} votes / {participants} eligible voters") }
                     </>
                 }
             }
@@ -200,7 +200,7 @@ impl Home {
                 html! {
                     <>
                         <strong>{ "Tallying:" }</strong>
-                        { format!(" {} shares / {} talliers", shares, participants) }
+                        { format!(" {shares} shares / {participants} talliers") }
                     </>
                 }
             }

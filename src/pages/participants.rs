@@ -91,7 +91,7 @@ impl Participants {
             Err(err) => {
                 self.new_application = ValidatedValue {
                     value: application,
-                    error_message: Some(format!("Error parsing application: {}", err)),
+                    error_message: Some(format!("Error parsing application: {err}")),
                 };
                 return;
             }
@@ -100,7 +100,7 @@ impl Participants {
         self.new_application = ValidatedValue::unvalidated(application);
         if let Err(err) = parsed_application.validate(&self.poll_id) {
             self.new_application.error_message =
-                Some(format!("Error validating application: {}", err));
+                Some(format!("Error validating application: {err}"));
             return;
         }
         self.add_participant(parsed_application);
@@ -423,8 +423,8 @@ impl Component for Participants {
                 </>
             }
         } else {
-            let history = ctx.link().history().unwrap_throw();
-            history.replace(Route::NotFound);
+            let navigator = ctx.link().navigator().unwrap_throw();
+            navigator.replace(&Route::NotFound);
             html! {}
         }
     }
