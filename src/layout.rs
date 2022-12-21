@@ -291,7 +291,7 @@ impl PollSpec {
         is_selected: Option<bool>,
         onchange: Option<OptionChangeCallback>,
     ) -> Html {
-        let control_id = format!("poll-option{}", idx);
+        let control_id = format!("poll-option{idx}");
         let (control_type, control_name) = match ty {
             PollType::SingleChoice => ("radio", "poll-options".to_owned()),
             PollType::MultiChoice => ("checkbox", control_id.clone()),

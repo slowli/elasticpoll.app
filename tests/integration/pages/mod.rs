@@ -1,12 +1,13 @@
 //! Tests for application pages.
 
 use base64ct::{Base64UrlUnpadded, Encoding};
+use gloo_timers::future::sleep;
 use js_sys::{Error, Promise, Uint8Array};
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::Element;
-use yew::{html, Callback, Component, Context, ContextProvider, Html};
+use yew::{html, Callback, Component, Context, ContextProvider, Html, Renderer};
 
-use std::{cell::RefCell, marker::PhantomData, rc::Rc};
+use std::{cell::RefCell, marker::PhantomData, rc::Rc, time::Duration};
 
 use elasticpoll_wasm::{
     js::{ExportedData, ManageModals, PasswordBasedCrypto},
@@ -145,14 +146,16 @@ where
     C: Component,
     C::Properties: WithComponentRef<C>,
 {
-    fn new(mut props: C::Properties) -> Self {
+    async fn new(mut props: C::Properties) -> Self {
         let document = web_sys::window().unwrap().document().unwrap();
         let div = document.create_element("div").unwrap();
         document.body().unwrap().append_with_node_1(&div).unwrap();
 
         let component = ComponentRef::<C>::default();
         props.set_component_ref(component.clone());
-        let app_handle = yew::start_app_with_props_in_element::<Wrapper<C>>(div.clone(), props);
+        let app_handle = Renderer::<Wrapper<C>>::with_root_and_props(div.clone(), props).render();
+        sleep(Duration::ZERO).await; // wait for app to initialize
+
         let export_calls = &app_handle
             .get_component()
             .expect_throw("cannot get wrapper")
@@ -165,8 +168,9 @@ where
         }
     }
 
-    fn send_message(&self, message: C::Message) {
+    async fn send_message(&self, message: C::Message) {
         self.component.send_message(message);
+        sleep(Duration::ZERO).await; // wait for the message to be delivered
     }
 
     fn export_calls(&self) -> &Calls<ExportedData> {
@@ -176,17 +180,17 @@ where
 
 fn assert_no_child(root: &Element, selector: &str) {
     let selected = root.query_selector(selector).unwrap_or_else(|err| {
-        panic!("Cannot query `{}` from {:?}: {:?}", selector, root, err);
+        panic!("Cannot query `{selector}` from {root:?}: {err:?}");
     });
     if let Some(selected) = selected {
-        panic!("Unexpected element `{}`: {:?}", selector, selected);
+        panic!("Unexpected element `{selector}`: {selected:?}");
     }
 }
 
 fn select_elements(root: &Element, selector: &str) -> impl Iterator<Item = Element> {
     let nodes = root
         .query_selector_all(selector)
-        .unwrap_or_else(|e| panic!("Querying elements `{}` failed: {:?}", selector, e));
+        .unwrap_or_else(|err| panic!("Querying elements `{selector}` failed: {err:?}"));
 
     (0..nodes.length()).filter_map(move |i| nodes.get(i).unwrap().dyn_into::<Element>().ok())
 }
@@ -197,8 +201,8 @@ fn select_single_element(root: &Element, selector: &str) -> Element {
     let second = iter.next();
 
     match (first, second) {
-        (None, _) => panic!("`{}` did not match any elements in {:?}", selector, root),
-        (Some(_), Some(_)) => panic!("`{}` matched multiple elements in {:?}", selector, root),
+        (None, _) => panic!("`{selector}` did not match any elements in {root:?}"),
+        (Some(_), Some(_)) => panic!("`{selector}` matched multiple elements in {root:?}"),
         (Some(single), None) => single,
     }
 }

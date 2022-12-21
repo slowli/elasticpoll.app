@@ -240,8 +240,8 @@ impl fmt::Display for VoteError {
                     actual.as_human_string()
                 )
             }
-            Self::Signature(err) => write!(formatter, "cannot verify voter's signature: {}", err),
-            Self::Choice(err) => write!(formatter, "cannot verify choice: {}", err),
+            Self::Signature(err) => write!(formatter, "cannot verify voter's signature: {err}"),
+            Self::Choice(err) => write!(formatter, "cannot verify choice: {err}"),
         }
     }
 }
@@ -280,7 +280,7 @@ impl From<Vote> for SubmittedVote {
     fn from(vote: Vote) -> Self {
         let json = serde_json::to_string(&vote.choice)
             .expect_throw("cannot serialize `EncryptedVoteChoice`");
-        let vote_hash = Sha256::digest(&json);
+        let vote_hash = Sha256::digest(json);
 
         Self {
             inner: vote,

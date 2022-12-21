@@ -81,7 +81,7 @@ impl Voting {
             Err(err) => {
                 self.new_vote = ValidatedValue {
                     value: vote,
-                    error_message: Some(format!("Error parsing vote: {}", err)),
+                    error_message: Some(format!("Error parsing vote: {err}")),
                 };
                 return;
             }
@@ -91,7 +91,7 @@ impl Voting {
             if let Err(err) = state.insert_vote(&self.poll_id, parsed_vote) {
                 self.new_vote = ValidatedValue {
                     value: vote,
-                    error_message: Some(format!("Error verifying vote: {}", err)),
+                    error_message: Some(format!("Error verifying vote: {err}")),
                 };
                 return;
             }
@@ -422,8 +422,8 @@ impl Component for Voting {
                 </>
             }
         } else {
-            let history = ctx.link().history().unwrap_throw();
-            history.replace(Route::NotFound);
+            let navigator = ctx.link().navigator().unwrap_throw();
+            navigator.replace(&Route::NotFound);
             html! {}
         }
     }

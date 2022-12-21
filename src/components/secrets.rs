@@ -3,7 +3,7 @@
 use js_sys::Error;
 use wasm_bindgen::UnwrapThrowExt;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{FocusEvent, HtmlInputElement};
+use web_sys::{HtmlInputElement, SubmitEvent};
 use yew::{classes, html, Callback, Component, Context, Html, NodeRef, Properties};
 
 use crate::{
@@ -46,15 +46,14 @@ impl Secrets {
         let (alert_text, button_caption) = match secrets.status() {
             Some(SecretManagerStatus::Locked) => (
                 format!(
-                    "The secret is locked. Unlock to find out whether a {} was submitted by you, \
-                     or to submit a new {0}.",
-                    item
+                    "The secret is locked. Unlock to find out whether a {item} \
+                     was submitted by you, or to submit a new {item}.",
                 ),
                 "Unlock",
             ),
             Some(SecretManagerStatus::Unlocked) => return html! {},
             None => (
-                format!("No secret. Create a secret to submit a {}.", item),
+                format!("No secret. Create a secret to submit a {item}."),
                 "Create secret",
             ),
         };
@@ -86,7 +85,7 @@ impl Secrets {
         }
 
         html! {
-            <form onsubmit={link.callback(move |evt: FocusEvent| {
+            <form onsubmit={link.callback(move |evt: SubmitEvent| {
                 evt.prevent_default();
                 SecretsMessage::Submitted { new_secret }
             })}>
