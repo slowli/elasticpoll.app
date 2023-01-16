@@ -47,7 +47,7 @@
     "postcss": "^8.4.4",
     "postcss-loader": "^7.0.0",
     "prerender-spa-plugin": "^3.4.0",
-    "rimraf": "^3.0.2",
+    "rimraf": "^4.0.7",
     "sass": "^1.57.1",
     "sass-loader": "^13.2.0",
     "stylelint": "^14.16.0",
