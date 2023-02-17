@@ -105,7 +105,7 @@ fn assert_eq_ignoring_timestamps<T: WithTimestamp>(lhs: Option<&T>, rhs: Option<
                 .remove("submitted_at");
             assert_eq!(lhs_value, rhs_value);
         }
-        _ => panic!("{:?} != {:?}", lhs, rhs),
+        _ => panic!("{lhs:?} != {rhs:?}"),
     }
 }
 
@@ -239,7 +239,7 @@ fn invalid_poll_id_in_participant_application() {
 
     let err = app.validate(&poll_id).unwrap_err();
     let err = err.to_string();
-    assert!(err.contains("challenge"), "{}", err);
+    assert!(err.contains("challenge"), "{err}");
 }
 
 #[wasm_bindgen_test]
@@ -259,7 +259,7 @@ fn participant_application_with_mangled_public_key() {
         count += 1;
         mangled_app.validate(&poll_id).unwrap_err();
     }
-    assert!(count > 20, "Too few valid mangled elements: {}", count);
+    assert!(count > 20, "Too few valid mangled elements: {count}");
 }
 
 #[wasm_bindgen_test]

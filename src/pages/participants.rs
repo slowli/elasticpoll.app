@@ -56,9 +56,8 @@ pub struct Participants {
 impl Participants {
     fn we_are_participant(&self, state: &PollState, ctx: &Context<Self>) -> bool {
         let secrets = AppProperties::from_ctx(ctx).secrets;
-        let pk = match secrets.public_key_for_poll(&self.poll_id) {
-            Some(pk) => pk,
-            None => return false,
+        let Some(pk) = secrets.public_key_for_poll(&self.poll_id) else {
+            return false;
         };
         state.has_participant(&pk)
     }

@@ -386,17 +386,15 @@ impl fmt::Display for TallierShareError {
             Self::OptionsCount { expected, actual } => {
                 write!(
                     formatter,
-                    "unexpected number of options: expected {}, got {}",
-                    expected, actual
+                    "unexpected number of options: expected {expected}, got {actual}"
                 )
             }
             Self::IneligibleTallier => formatter.write_str("tallier is not eligible"),
             Self::InvalidShare { index, err } => {
                 write!(
                     formatter,
-                    "cannot verify share for option #{}: {}",
-                    *index + 1,
-                    err
+                    "cannot verify share for option #{}: {err}",
+                    *index + 1
                 )
             }
         }

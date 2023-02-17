@@ -463,25 +463,22 @@ impl fmt::Display for PollValidationError {
             Self::Application { key, err } => {
                 write!(
                     formatter,
-                    "cannot validate application for participant {}: {}",
-                    key.encode(),
-                    err
+                    "cannot validate application for participant {}: {err}",
+                    key.encode()
                 )
             }
             Self::Vote { key, err } => {
                 write!(
                     formatter,
-                    "cannot validate vote for participant {}: {}",
-                    key.encode(),
-                    err
+                    "cannot validate vote for participant {}: {err}",
+                    key.encode()
                 )
             }
             Self::TallierShare { key, err } => {
                 write!(
                     formatter,
-                    "cannot validate tallier share for participant {}: {}",
-                    key.encode(),
-                    err
+                    "cannot validate tallier share for participant {}: {err}",
+                    key.encode()
                 )
             }
 
