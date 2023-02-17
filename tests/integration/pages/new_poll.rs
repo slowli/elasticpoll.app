@@ -32,7 +32,7 @@ async fn error_on_empty_title() {
         .await;
     let title_input_parent = input_col(&rig.root_element, "#title");
     let feedback = extract_feedback(&title_input_parent);
-    assert!(feedback.contains("cannot be empty"), "{}", feedback);
+    assert!(feedback.contains("cannot be empty"), "{feedback}");
 }
 
 #[wasm_bindgen_test]
@@ -52,8 +52,7 @@ async fn error_on_duplicate_option() {
         let feedback = extract_feedback(&option_col);
         assert!(
             feedback.contains("descriptions must be unique"),
-            "{}",
-            feedback
+            "{feedback}"
         );
     }
 
@@ -175,11 +174,7 @@ async fn importing_a_poll() {
     assert_eq!(spec_json, invalid_spec_json);
     let spec_col = input_col(&rig.root_element, "#poll-spec");
     let feedback = extract_feedback(&spec_col);
-    assert!(
-        feedback.contains("Error deserializing spec"),
-        "{}",
-        feedback
-    );
+    assert!(feedback.contains("Error deserializing spec"), "{feedback}");
 
     rig.send_message(NewPollMessage::SpecReset).await;
     let spec = extract_spec(&rig);

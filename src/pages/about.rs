@@ -29,11 +29,7 @@ impl Package {
                         <>
                             { " @ commit " }
                             {if let Some(repo) = self.github_repo {
-                                let repo_link = format!(
-                                    "https://github.com/{repo}/tree/{rev}",
-                                    repo = repo,
-                                    rev = rev
-                                );
+                                let repo_link = format!("https://github.com/{repo}/tree/{rev}");
                                 html! {
                                     <a href={repo_link} target="_blank">{ short_rev }</a>
                                 }

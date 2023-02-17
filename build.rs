@@ -87,7 +87,7 @@ fn record_git_info() -> Result<(), Box<dyn StdError>> {
     let out_dir = env::var("OUT_DIR").unwrap();
     let out_path = Path::new(&out_dir).join("git_info.rs");
     let mut out_file = File::create(out_path)?;
-    writeln!(out_file, "{}", git_info)?;
+    writeln!(out_file, "{git_info}")?;
 
     println!("cargo:rerun-if-changed=.git/logs/HEAD");
 
@@ -134,7 +134,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
     let mut out_file = File::create(out_path)?;
     writeln!(out_file, "&[")?;
     for package in packages {
-        writeln!(out_file, "    {},", package)?;
+        writeln!(out_file, "    {package},")?;
     }
     writeln!(out_file, "]")?;
 

@@ -135,7 +135,7 @@ impl<C: Component> Drop for TestRig<C> {
     fn drop(&mut self) {
         if let Some(parent) = self.root_element.parent_element() {
             if let Err(err) = parent.remove_child(self.root_element.as_ref()) {
-                eprintln!("Error disposing root element for test rig: {:?}", err);
+                eprintln!("Error disposing root element for test rig: {err:?}");
             }
         }
     }
