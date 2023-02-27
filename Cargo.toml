@@ -20,7 +20,7 @@ wasm-opt = ["--strip-debug", "--enable-mutable-globals"]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-base64ct = { version = "1.3.3", features = ["std"] }
+base64ct = { version = "1.6.0", features = ["std"] }
 js-sys = "0.3.55"
 merlin = "3.0.0"
 rand_core = "0.6.3"
