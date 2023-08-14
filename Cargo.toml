@@ -51,7 +51,7 @@ features = ["std", "curve25519-dalek-ng", "serde"]
 
 [dev-dependencies]
 assert_matches = "1.5.0"
-gloo-timers = { version = "0.2.5", features = ["futures"] }
+gloo-timers = { version = "0.3.0", features = ["futures"] }
 rand = "0.8.4"
 wasm-bindgen-test = "0.3.28"
 
