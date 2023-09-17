@@ -27,9 +27,13 @@ confidence-threshold = 0.8
 [bans]
 multiple-versions = "deny"
 wildcards = "deny"
+skip = [
+  # Old version used by `gloo` crates; hopefully, will updated soon
+  { name = "serde-wasm-bindgen", version = "^0.5" },
+]
 skip-tree = [
   # Build dependency that produces several multiple versions
-  { name = "toml", version = "^0.7.8" },
+  { name = "toml", version = "^0.8" },
 ]
 
 [sources]
