@@ -5,17 +5,28 @@ updates:
     schedule:
       interval: daily
       time: "03:00"
+    groups:
+      dev-dependencies:
+        dependency-type: "development"
+      minor-changes:
+        update-types:
+          - "minor"
+          - "patch"
     open-pull-requests-limit: 10
     assignees: [ slowli ]
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-patch"]
 
   - package-ecosystem: npm
     directory: "/"
     schedule:
       interval: daily
       time: "03:00"
+    groups:
+      dev-dependencies:
+        dependency-type: "development"
+      minor-changes:
+        update-types:
+          - "minor"
+          - "patch"
     open-pull-requests-limit: 10
     assignees: [ slowli ]
     ignore:
