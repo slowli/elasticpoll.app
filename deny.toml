@@ -34,6 +34,8 @@ skip = [
 skip-tree = [
   # Build dependency that produces several multiple versions
   { name = "toml", version = "^0.8" },
+  # Dependency that relies on old versions of `gloo*`
+  { name = "prokio", version = "^0.1" },
 ]
 
 [sources]

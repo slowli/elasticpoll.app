@@ -14,7 +14,7 @@ fn view_local_timestamp(timestamp: f64) -> Html {
     let date = Date::new(&timestamp.into());
     html! {
         <span title="This is a local timestamp; it is not synced among participants">
-            { date.to_utc_string() }
+            { String::from(&date.to_utc_string()) }
         </span>
     }
 }

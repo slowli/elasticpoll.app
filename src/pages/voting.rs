@@ -415,7 +415,7 @@ impl Component for Voting {
                                 <Rollback
                                     removed_entities="votes"
                                     changed_entities="participants"
-                                    onconfirmed={link.callback(|_| VotingMessage::Rollback)} />
+                                    onconfirmed={link.callback(|()| VotingMessage::Rollback)} />
                             </>
                         }
                     }}
