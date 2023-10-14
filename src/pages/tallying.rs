@@ -379,7 +379,7 @@ impl Component for Tallying {
                                 <Rollback
                                     removed_entities="tallying shares"
                                     changed_entities="votes"
-                                    onconfirmed={link.callback(|_| TallyingMessage::Rollback)} />
+                                    onconfirmed={link.callback(|()| TallyingMessage::Rollback)} />
                             </>
                         }
                     }}
