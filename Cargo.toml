@@ -21,7 +21,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 base64ct = { version = "1.6.0", features = ["std"] }
-js-sys = "0.3.55"
+js-sys = "0.3.65"
 merlin = "3.0.0"
 rand_core = "0.6.3"
 secrecy = "0.8.0"
