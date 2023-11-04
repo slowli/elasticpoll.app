@@ -40,9 +40,7 @@ yew-router = "0.18.0"
 getrandom = { version = "0.2", features = ["custom"] }
 
 [dependencies.elastic-elgamal]
-git = "https://github.com/slowli/elastic-elgamal.git"
-rev = "1df41e2f05e15d7bccdd3bafd2704999bee4b285"
-version = "0.3.0-beta.1"
+version = "0.3.0"
 default-features = false
 features = ["std", "curve25519-dalek", "serde"]
 
