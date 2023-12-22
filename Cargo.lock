@@ -267,7 +267,7 @@ dependencies = [
  "secrecy",
  "secret-tree",
  "serde",
- "serde-wasm-bindgen 0.6.2",
+ "serde-wasm-bindgen 0.6.3",
  "serde_json",
  "sha2",
  "toml",
@@ -595,7 +595,7 @@ dependencies = [
  "gloo-events 0.2.0",
  "gloo-utils 0.2.0",
  "serde",
- "serde-wasm-bindgen 0.6.2",
+ "serde-wasm-bindgen 0.6.3",
  "serde_urlencoded",
  "thiserror",
  "wasm-bindgen",
@@ -1231,9 +1231,9 @@ dependencies = [
 
 [[package]]
 name = "serde-wasm-bindgen"
-version = "0.6.2"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67d27afff48127b3edfe6ad379a2bd0795d2cfa56730ca2745e5b89386126404"
+checksum = "b9b713f70513ae1f8d92665bbbbda5c295c2cf1da5542881ae5eefe20c9af132"
 dependencies = [
  "js-sys",
  "serde",
