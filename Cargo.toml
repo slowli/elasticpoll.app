@@ -53,7 +53,7 @@ wasm-bindgen-test = "0.3.40"
 [build-dependencies]
 regex = "1.10.3"
 serde = { version = "1.0", features = ["derive"] }
-toml = "0.8.9"
+toml = "0.8.10"
 
 [features]
 default = []
