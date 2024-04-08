@@ -51,7 +51,7 @@ rand = "0.8.4"
 wasm-bindgen-test = "0.3.42"
 
 [build-dependencies]
-regex = "1.10.3"
+regex = "1.10.4"
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.8.12"
 
