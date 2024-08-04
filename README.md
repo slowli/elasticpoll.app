@@ -42,8 +42,8 @@ Thus, polls created in one version of the app may become unreadable in the follo
 ## Running locally
 
 You will need to install a Node / npm toolchain (preferably via a manager like [`nvm`])
-and a Rust toolchain (preferably via [`rustup`]). Both toolchains should be recent; i.e., Node 18-LTS
-and Rust 1.72+. You should also install [`wasm-pack`].
+and a Rust toolchain (preferably via [`rustup`]). Both toolchains should be recent; i.e., Node 20-LTS
+and Rust 1.80+. You should also install [`wasm-pack`].
 
 To serve the app locally with the Webpack dev server, run
 
