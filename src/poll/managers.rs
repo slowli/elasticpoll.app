@@ -2,7 +2,6 @@
 
 use js_sys::{Error, JsString, Uint8Array};
 use rand_core::OsRng;
-use secrecy::ExposeSecret;
 use secret_tree::{SecretTree, Seed};
 use wasm_bindgen::{JsCast, UnwrapThrowExt};
 use wasm_bindgen_futures::JsFuture;
@@ -180,7 +179,7 @@ impl SecretManager {
                     .expect_throw("unexpected cached output");
                 let mut seed = [0_u8; 32];
                 secret_bytes.copy_to(&mut seed);
-                this.unlock_with_secret(SecretTree::from_seed(Seed::new(seed)));
+                this.unlock_with_secret(SecretTree::from_seed(Seed::from(&seed)));
                 true
             } else {
                 // TODO: log errors?
@@ -234,7 +233,7 @@ impl SecretManager {
                         .expect_throw("unexpected open_fn output");
                     let mut seed = [0_u8; 32];
                     secret_bytes.copy_to(&mut seed);
-                    this.unlock_with_secret(SecretTree::from_seed(Seed::new(seed)));
+                    this.unlock_with_secret(SecretTree::from_seed(Seed::from(&seed)));
                 })
                 .map_err(|err| {
                     err.dyn_into::<Error>()

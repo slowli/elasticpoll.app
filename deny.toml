@@ -6,6 +6,9 @@ feature-depth = 1
 [advisories]
 db-urls = ["https://github.com/rustsec/advisory-db"]
 yanked = "deny"
+ignore = [
+  "RUSTSEC-2024-0370", # proc-macro-error is unsupported; no fix yet
+]
 
 [licenses]
 allow = [
@@ -34,3 +37,6 @@ skip-tree = [
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
+
+[sources.allow-org]
+github = ["slowli"]
