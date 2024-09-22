@@ -260,7 +260,6 @@ dependencies = [
  "rand",
  "rand_core",
  "regex",
- "secrecy 0.10.1",
  "secret-tree",
  "serde",
  "serde-wasm-bindgen 0.6.5",
@@ -1207,15 +1206,6 @@ dependencies = [
 
 [[package]]
 name = "secrecy"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9bd1c54ea06cfd2f6b63219704de0b9b4f72dcc2b8fdef820be6cd799780e91e"
-dependencies = [
- "zeroize",
-]
-
-[[package]]
-name = "secrecy"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d97d6b0620457bfe19b3b0fbfdd4c2c172a14c108096b8ff8bca6a71001f5d91"
@@ -1226,13 +1216,12 @@ dependencies = [
 [[package]]
 name = "secret-tree"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "189a90fff102d7e4c73fc172ed0c56e1100ffeb6b25de4d91f9f7fa4cc2b7681"
+source = "git+https://github.com/slowli/secret-tree.git?rev=848b955a310146fc5a2a8477e2baf26ebff6c6bc#848b955a310146fc5a2a8477e2baf26ebff6c6bc"
 dependencies = [
  "blake2",
- "rand",
  "rand_chacha",
- "secrecy 0.8.0",
+ "rand_core",
+ "secrecy",
 ]
 
 [[package]]
