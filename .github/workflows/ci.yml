@@ -28,6 +28,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
+          targets: wasm32-unknown-unknown
           components: rustfmt, clippy
       - name: Install wasm-pack
         uses: jetli/wasm-pack-action@v0.4.0
@@ -45,7 +46,7 @@ jobs:
       - name: Format Rust code
         run: "npm run lint:fmt"
       - name: Clippy
-        run: cargo clippy --all-features --all-targets -- -D warnings
+        run: cargo clippy --all-features --all-targets --target=wasm32-unknown-unknown -- -D warnings
       - name: Check Rust dependencies
         run: cargo deny check
 
