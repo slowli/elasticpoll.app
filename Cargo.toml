@@ -28,9 +28,9 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde-wasm-bindgen = "0.6.5"
 sha2 = "0.10.8"
-wasm-bindgen = "0.2.89"
+wasm-bindgen = "0.2.95"
 wasm-bindgen-futures = "0.4.43"
-web-sys = { version = "0.3.70", features = ["NodeList", "HtmlButtonElement"] }
+web-sys = { version = "0.3.72", features = ["NodeList", "HtmlButtonElement"] }
 yew = { version = "0.21.0", features = ["csr"] }
 yew-router = "0.18.0"
 
@@ -54,7 +54,7 @@ rand = "0.8.4"
 wasm-bindgen-test = "0.3.43"
 
 [build-dependencies]
-regex = "1.10.5"
+regex = "1.11.0"
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.8.15"
 
