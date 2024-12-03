@@ -28,9 +28,9 @@
   },
   "homepage": "https://github.com/slowli/elasticpoll.app#readme",
   "devDependencies": {
-    "@babel/core": "^7.25.2",
+    "@babel/core": "^7.26.0",
     "@babel/plugin-transform-runtime": "^7.25.4",
-    "@babel/preset-env": "^7.25.3",
+    "@babel/preset-env": "^7.26.0",
     "@wasm-tool/wasm-pack-plugin": "^1.7.0",
     "autoprefixer": "^10.4.0",
     "babel-loader": "^9.2.1",
@@ -48,22 +48,22 @@
     "postcss-loader": "^8.1.0",
     "prerender-spa-plugin": "^3.4.0",
     "rimraf": "^6.0.1",
-    "sass": "^1.79.3",
+    "sass": "^1.81.1",
     "sass-loader": "^16.0.0",
-    "stylelint": "^16.9.0",
+    "stylelint": "^16.11.0",
     "stylelint-config-recommended-scss": "^14.1.0",
     "wasm-pack": "^0.13.0",
-    "webpack": "^5.94.0",
+    "webpack": "^5.96.1",
     "webpack-cli": "^5.1.1",
     "webpack-dev-server": "^5.1.0",
-    "workbox-webpack-plugin": "^7.1.0"
+    "workbox-webpack-plugin": "^7.3.0"
   },
   "dependencies": {
-    "@babel/runtime": "^7.25.6",
+    "@babel/runtime": "^7.26.0",
     "bootstrap": "^5.3.0",
     "bootstrap-icons": "^1.11.0",
     "copy-text-to-clipboard": "^3.2.0",
-    "workbox-precaching": "^7.0.0"
+    "workbox-precaching": "^7.3.0"
   },
   "browserslist": [
     "defaults"
